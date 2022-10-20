@@ -1,0 +1,9 @@
+- Little endian, LSB then MSB.
+  If two bytes are together, first 00 and then FF, the instruction is FF00.
+- Opcodes are 8 bits, AAABBBCC
+  AAA and CC define opcode.
+  BB defines addressing mode.
+  If the BB is an addressing mode that has some operand mode, then it can require 0, 1, or 2 extra bits. These are also stored in Little Endian.
+- Same operation, different addressing mode is going to have the same top 3 bits and same bottom 2 bits.
+- All of the addressing modes deal with operands except two: impl (operand implied) and rel (branch target)???
+  So worry about those two, and then for everything else have a generic operand retrieval function! YAAAAAY!
