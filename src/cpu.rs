@@ -1,5 +1,88 @@
+use std::str::FromStr;
+
+use ndarray::Array2;
+use strum_macros::EnumString;
+
 use crate::bus;
 
+#[derive(EnumString)]
+enum Instruction {
+    ADC,
+    AND,
+    ASL,
+    BCC,
+    BCS,
+    BEQ,
+    BIT,
+    BMI,
+    BNE,
+    BPL,
+    BRK,
+    BVC,
+    BVS,
+    CLC,
+    CLD,
+    CLI,
+    CLV,
+    CMP,
+    CPX,
+    CPY,
+    DEC,
+    DEX,
+    DEY,
+    EOR,
+    INC,
+    INX,
+    INY,
+    JMP,
+    JSR,
+    LDA,
+    LDX,
+    LDY,
+    LSR,
+    NOP,
+    ORA,
+    PHA,
+    PHP,
+    PLA,
+    PLP,
+    ROL,
+    ROR,
+    RTS,
+    RTI,
+    SBC,
+    SEC,
+    SED,
+    SEI,
+    STA,
+    STX,
+    STY,
+    TAX,
+    TAY,
+    TSX,
+    TXA,
+    TXS,
+    TYA
+}
+
+
+enum AddressMode {
+    Accumulator,
+    Absolute,
+    AbsoluteXIndex,
+    AbsoluteYIndex,
+    Immediate,
+    Implied,
+    Indirect,
+    IndirectXIndex,
+    IndirectYIndex,
+    Relative,
+    Zeropage,
+    ZeropageXIndex,
+    ZeropageYIndex
+}
+
+#[derive(Debug, Clone, Copy)]
 struct StatusRegister {
     negative: bool,
     overflow: bool,
@@ -36,11 +119,31 @@ struct Cpu<T: bus::Bus> {
     y: u16,
     status: StatusRegister,
     stack_pointer: u8,
-    bus: T
+    bus: T,
+    lookup_table: Array2<&'static str>
 }
 
 impl<T: bus::Bus> Cpu<T> {
     pub fn new(bus: T) -> Self {
+        let lookup_table = ndarray::arr2(&[
+            ["BRK impl", "ORA X,ind", "---", "---", "---", "ORA zpg", "ASL zpg", "---", "PHP impl", "ORA #", "ASL A", "---", "---", "ORA abs", "ASL abs", "---"],
+            ["BPL rel", "ORA ind,Y", "---", "---", "---", "ORA zpg,X", "ASL zpg,X", "---", "CLC impl", "ORA abs,Y", "---", "---", "---", "ORA abs,X", "ASL abs,X", "---"],
+            ["JSR abs", "AND X,ind", "---", "---", "BIT zpg", "AND zpg", "ROL zpg", "---", "PLP impl", "AND #", "ROL A", "---", "BIT abs", "AND abs", "ROL abs", "---"],
+            ["BMI rel", "AND ind,Y", "---", "---", "---", "AND zpg,X", "ROL zpg,X", "---", "SEC impl", "AND abs,Y", "---", "---", "---", "AND abs,X", "ROL abs,X", "---"],
+            ["RTI impl", "EOR X,ind", "---", "---", "---", "EOR zpg", "LSR zpg", "---", "PHA impl", "EOR #", "LSR A", "---", "JMP abs", "EOR abs", "LSR abs", "---"],
+            ["BVC rel", "EOR ind,Y", "---", "---", "---", "EOR zpg,X", "LSR zpg,X", "---", "CLI impl", "EOR abs,Y", "---", "---", "---", "EOR abs,X", "LSR abs,X", "---"],
+            ["RTS impl", "ADC X,ind", "---", "---", "---", "ADC zpg", "ROR zpg", "---", "PLA impl", "ADC #", "ROR A", "---", "JMP ind", "ADC abs", "ROR abs", "---"],
+            ["BVS rel", "ADC ind,Y", "---", "---", "---", "ADC zpg,X", "ROR zpg,X", "---", "SEI impl", "ADC abs,Y", "---", "---", "---", "ADC abs,X", "ROR abs,X", "---"],
+            ["---",    "STA X,ind", "---", "---", "STY zpg", "STA zpg", "STX zpg", "---", "DEY impl", "---", "TXA impl", "---", "STY abs", "STA abs", "STX abs", "---"],
+            ["BCC rel", "STA ind,Y", "---", "---", "STY zpg,X", "STA zpg,X", "STX zpg,Y", "---", "TYA impl", "STA abs,Y", "TXS impl", "---", "---", "STA abs,X", "---", "---"],
+            ["LDY #", "LDA X,ind", "LDX #", "---", "LDY zpg", "LDA zpg", "LDX zpg", "---", "TAY impl", "LDA #", "TAX impl", "---", "LDY abs", "LDA abs", "LDX abs", "---"],
+            ["BCS rel", "LDA ind,Y", "---", "---", "LDY zpg,X", "LDA zpg,X", "LDX zpg,Y", "---", "CLV impl", "LDA abs,Y", "TSX impl", "---", "LDY abs,X", "LDA abs,X", "LDX abs,Y", "---"],
+            ["CPY #", "CMP X,ind", "---", "---", "CPY zpg", "CMP zpg", "DEC zpg", "---", "INY impl", "CMP #", "DEX impl", "---", "CPY abs", "CMP abs", "DEC abs", "---"],
+            ["BNE rel", "CMP ind,Y", "---", "---", "---", "CMP zpg,X", "DEC zpg,X", "---", "CLD impl", "CMP abs,Y", "---", "---", "---", "CMP abs,X", "DEC abs,X", "---"],
+            ["CPX #", "SBC X,ind", "---", "---", "CPX zpg", "SBC zpg", "INC zpg", "---", "INX impl", "SBC #", "NOP impl", "---", "CPX abs", "SBC abs", "INC abs", "---"],
+            ["BEQ rel", "SBC ind,Y", "---", "---", "---", "SBC zpg,X", "INC zpg,X", "---", "SED impl", "SBC abs,Y", "---", "---", "---", "SBC abs,X", "INC abs,X", "---"]
+        ]);
+
         Cpu {
             program_counter: 0,
             accumulator: 0,
@@ -48,20 +151,26 @@ impl<T: bus::Bus> Cpu<T> {
             y: 0,
             status: StatusRegister::new(),
             stack_pointer: 0,
-            bus
+            bus,
+            lookup_table
         }
     }
 
     pub fn step(&mut self) {
         let opcode = self.bus.read(self.program_counter);
-        let a = opcode & (0b11100000) >> 5;
-        let b = opcode & (0b00011100) >> 2;
-        let c = opcode & (0b00000011);
 
-        match (a, b, c) {
+        let high_nibble = (opcode & 0xF0) >> 4;
+        let low_nibble = opcode & 0x0F;
+
+        let instruction = self.lookup_table.get([high_nibble as usize, low_nibble as usize]).unwrap().split(" ").collect::<Vec<&str>>();
+
+        let opcode = Instruction::from_str(instruction[0]).unwrap();
+        let address_mode = match instruction[1] {
+
             _ => {
-                eprintln!("oh noesy woesy!");
+                eprintln("Oh noesy woesy!")
             }
-        }
+        };
+
     }
 }
