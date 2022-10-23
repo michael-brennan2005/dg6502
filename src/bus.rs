@@ -17,7 +17,7 @@ impl TryFrom<Vec<u8>> for BasicBus {
         if value.len() > 65535 {
             Err(())
         } else {
-            let mut buffer: Vec<u8> = Vec::with_capacity(65535);
+            let mut buffer: Vec<u8> = vec![0; 65535];
             for (index, ele) in value.iter().enumerate() {
                 buffer[index] = *ele;
             }

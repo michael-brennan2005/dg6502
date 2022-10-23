@@ -5,8 +5,8 @@ use strum_macros::EnumString;
 
 use crate::bus;
 
-#[derive(EnumString)]
-enum Instruction {
+#[derive(EnumString, Debug)]
+pub enum Instruction {
     ADC,
     AND,
     ASL,
@@ -65,20 +65,33 @@ enum Instruction {
     TYA
 }
 
-
-enum AddressMode {
+#[derive(EnumString, Debug, Copy, Clone)]
+pub enum AddressMode {
+    #[strum(serialize="A")]
     Accumulator,
+    #[strum(serialize="abs")]
     Absolute,
+    #[strum(serialize="abs,X")]
     AbsoluteXIndex,
+    #[strum(serialize="abs,Y")]
     AbsoluteYIndex,
+    #[strum(serialize="#")]
     Immediate,
+    #[strum(serialize="impl")]
     Implied,
+    #[strum(serialize="ind")]
     Indirect,
+    #[strum(serialize="X,ind")]
     IndirectXIndex,
+    #[strum(serialize="ind,Y")]
     IndirectYIndex,
+    #[strum(serialize="rel")]
     Relative,
+    #[strum(serialize="zpg")]
     Zeropage,
+    #[strum(serialize="zpg,X")]
     ZeropageXIndex,
+    #[strum(serialize="zpg,Y")]
     ZeropageYIndex
 }
 
@@ -112,11 +125,11 @@ impl Into<u8> for StatusRegister {
     }
 }
 
-struct Cpu<T: bus::Bus> {
-    program_counter: u16,
-    accumulator: u16,
-    x: u16,
-    y: u16,
+pub struct Cpu<T: bus::Bus> {
+    pub program_counter: u16,
+    accumulator: u8,
+    x: u8,
+    y: u8,
     status: StatusRegister,
     stack_pointer: u8,
     bus: T,
@@ -156,6 +169,86 @@ impl<T: bus::Bus> Cpu<T> {
         }
     }
 
+    pub fn fetch_operand(&mut self, address_mode: AddressMode) -> u8 {
+        match address_mode {
+            AddressMode::Accumulator => {
+                self.accumulator
+            },
+            AddressMode::Absolute => {
+                let low_byte = self.bus.read(self.program_counter + 1);
+                let high_byte = self.bus.read(self.program_counter + 2);
+                self.program_counter += 2;
+                let address = ((high_byte as u16) << 8) | low_byte as u16;
+                self.bus.read(address)
+            },
+            AddressMode::AbsoluteXIndex => {
+                 let low_byte = self.bus.read(self.program_counter + 1);
+                let high_byte = self.bus.read(self.program_counter + 2);
+                self.program_counter += 2;
+                let address = (((high_byte as u16) << 8) | low_byte as u16) + (self.x as u16);
+                self.bus.read(address)
+
+            },
+            AddressMode::AbsoluteYIndex => {
+                let low_byte = self.bus.read(self.program_counter + 1);
+                let high_byte = self.bus.read(self.program_counter + 2);
+                self.program_counter += 2;
+                let address = (((high_byte as u16) << 8) | low_byte as u16) + (self.y as u16);
+                self.bus.read(address)
+            },
+            AddressMode::Immediate => {
+                let byte = self.bus.read(self.program_counter + 1);
+                self.program_counter += 1;
+                byte
+            },
+            AddressMode::Implied => {
+                0
+            },
+            // only JMP uses this, and it does some weird 16 bit value thing. Do that in the instruction
+            AddressMode::Indirect => {
+                0
+            },
+            AddressMode::IndirectXIndex => {
+                let byte = self.bus.read(self.program_counter + 1);
+                self.program_counter += 1;
+                let low_byte = self.bus.read((byte + self.x) as u16);
+                let high_byte = self.bus.read((byte + self.x + 1) as u16);
+                let address = ((high_byte as u16) << 8) | low_byte as u16;
+
+                self.bus.read(address)
+            },
+            AddressMode::IndirectYIndex => {
+                // fetch  address at zero page
+                let zeropage_byte = self.bus.read(self.program_counter + 1);
+                self.program_counter += 1;
+                let low_byte = self.bus.read((zeropage_byte) as u16);
+                let high_byte = self.bus.read((zeropage_byte + 1) as u16);
+                let address = (((high_byte as u16) << 8) | low_byte as u16) + (self.y as u16);
+                self.bus.read(address)
+            },
+            // only BRANCH functions use this, and it returns 16 bit, do it instruction
+            AddressMode::Relative => {
+                0
+            },
+            AddressMode::Zeropage => {
+                let low_byte = self.bus.read(self.program_counter + 1);
+                self.program_counter += 1;
+                self.bus.read(low_byte as u16)
+            },
+            AddressMode::ZeropageXIndex => {
+                let low_byte = self.bus.read(self.program_counter + 1);
+                self.program_counter += 1;
+                self.bus.read(low_byte as u16 + self.x as u16)
+            },
+            AddressMode::ZeropageYIndex => {
+                let low_byte = self.bus.read(self.program_counter + 1);
+                self.program_counter += 1;
+                self.bus.read(low_byte as u16 + self.y as u16)
+            },
+        }
+
+    }
+
     pub fn step(&mut self) {
         let opcode = self.bus.read(self.program_counter);
 
@@ -165,12 +258,10 @@ impl<T: bus::Bus> Cpu<T> {
         let instruction = self.lookup_table.get([high_nibble as usize, low_nibble as usize]).unwrap().split(" ").collect::<Vec<&str>>();
 
         let opcode = Instruction::from_str(instruction[0]).unwrap();
-        let address_mode = match instruction[1] {
+        let address_mode = AddressMode::from_str(instruction[1]).unwrap();
+        self.fetch_operand(address_mode);
+        println!("{:?} with address mode {:?}", opcode, address_mode);
 
-            _ => {
-                eprintln("Oh noesy woesy!")
-            }
-        };
-
+        self.program_counter += 1;
     }
 }
