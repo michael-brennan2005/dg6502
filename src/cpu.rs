@@ -7,61 +7,117 @@ use crate::bus;
 
 #[derive(EnumString, Debug)]
 pub enum Instruction {
+    /// add with carry
     ADC,
+    /// and (with accumulator)
     AND,
+    /// arithmetic shift left
     ASL,
+    /// branch on carry clear
     BCC,
+    /// branch on carry set
     BCS,
+    /// branch on equal (zero set)
     BEQ,
+    /// bit test
     BIT,
+    /// branch on minus (negative set)
     BMI,
+    /// branch on not equal (zero clear)
     BNE,
+    /// branch on plus (negative clear)
     BPL,
+    /// break/interrupt
     BRK,
+    /// branch on overflow clear
     BVC,
+    /// branch on overflow set
     BVS,
+    /// clear carry
     CLC,
+    /// clear decimal
     CLD,
+    /// clear interrupt disable
     CLI,
+    /// clear overflow
     CLV,
+    /// compare (with accumulator)
     CMP,
+    /// compare with X
     CPX,
+    /// compare with Y
     CPY,
+    /// decrement
     DEC,
+    /// decrement X
     DEX,
+    /// decrement Y
     DEY,
+    /// exclusive or (with accumulator)
     EOR,
+    /// increment
     INC,
+    /// increment X
     INX,
+    /// increment Y
     INY,
+    /// jump
     JMP,
+    /// jump subroutine
     JSR,
+    /// load accumulator
     LDA,
+    /// load x
     LDX,
+    /// load y
     LDY,
+    /// logical shift right
     LSR,
+    /// no operation
     NOP,
+    /// or with accumulator
     ORA,
+    /// push accumulator
     PHA,
+    /// push processor status (SR)
     PHP,
+    /// pull accumulator
     PLA,
+    /// pull processor status (SR)
     PLP,
+    /// rotate left
     ROL,
+    /// rotate right
     ROR,
+    /// return from subroutine
     RTS,
+    /// return from interrupt
     RTI,
+    /// subtract with carry
     SBC,
+    /// set carry
     SEC,
+    /// set decimal
     SED,
+    /// set interrupt disable
     SEI,
+    /// store accumulator
     STA,
+    /// store x
     STX,
+    /// store y
     STY,
+    /// transfer accumulator to X
     TAX,
+    /// transfer accumulator to Y
     TAY,
+    /// transfer stack pointer to X
     TSX,
+    /// transfer X to accumulator
     TXA,
+    /// transfer X to stack pointer
     TXS,
+    /// transfer Y to accumulator
     TYA
 }
 
@@ -182,7 +238,7 @@ impl<T: bus::Bus> Cpu<T> {
                 self.bus.read(address)
             },
             AddressMode::AbsoluteXIndex => {
-                 let low_byte = self.bus.read(self.program_counter + 1);
+                let low_byte = self.bus.read(self.program_counter + 1);
                 let high_byte = self.bus.read(self.program_counter + 2);
                 self.program_counter += 2;
                 let address = (((high_byte as u16) << 8) | low_byte as u16) + (self.x as u16);
