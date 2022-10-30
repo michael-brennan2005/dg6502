@@ -14,10 +14,10 @@ impl TryFrom<Vec<u8>> for BasicBus {
     type Error = ();
 
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        if value.len() > 65535 {
+        if value.len() > 65536 {
             Err(())
         } else {
-            let mut buffer: Vec<u8> = vec![0; 65535];
+            let mut buffer: Vec<u8> = vec![0; 65536];
             for (index, ele) in value.iter().enumerate() {
                 buffer[index] = *ele;
             }
