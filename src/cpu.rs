@@ -307,9 +307,12 @@ impl<T: bus::Bus> Cpu<T> {
                 let address = (((high_byte as u16) << 8) | low_byte as u16) + (self.y as u16);
                 (self.bus.read(address), address)
             },
-            // only BRANCH functions use this, and it returns 16 bit, do it instruction
             AddressMode::Relative => {
-                (0,0)
+                // this will be broken
+                let byte = self.bus.read(self.program_counter + 1);
+                self.program_counter += 1;
+                let address = (self.program_counter as i16) + i16::from(byte);
+                (0,address as u16)
             },
             AddressMode::Zeropage => {
                 let low_byte = self.bus.read(self.program_counter + 1);
@@ -568,5 +571,149 @@ impl<T: bus::Bus> Cpu<T> {
     }
 
     // Shift & rotate instructions
+    pub fn asl(&mut self, address: u16, operand: u8, accumulator: bool) {
+        if accumulator {
+            let high_bit = (self.accumulator & 0b10000000) >> 7;
+            self.status.carry = high_bit == 1;
+            self.accumulator = self.accumulator << 1;
+            self.set_if_negative(self.accumulator);
+            self.set_if_zero(self.accumulator);
+        } else {
+            let high_bit = (operand & 0b10000000) >> 7;
+            self.status.carry = high_bit == 1;
+            let new_num = operand << 1;
+            self.bus.write(address, new_num);
+            self.set_if_negative(new_num);
+            self.set_if_zero(new_num);
+        }
+    }
 
+    pub fn lsr(&mut self, address: u16, operand: u8, accumulator: bool) {
+        if accumulator {
+            let low_bit = self.accumulator & 0b1;
+            self.status.carry = low_bit == 1;
+            self.accumulator = self.accumulator >> 1;
+            self.set_if_negative(self.accumulator);
+            self.set_if_zero(self.accumulator);
+        } else {
+            let low_bit = (operand & 0b10000000) >> 7;
+            self.status.carry = low_bit == 1;
+            let new_num = operand >> 1;
+            self.bus.write(address, new_num);
+            self.set_if_negative(new_num);
+            self.set_if_zero(new_num);
+        }
+    }
+
+    pub fn rol(&mut self, address: u16, operand: u8, accumulator: bool) {
+        if accumulator {
+            let high_bit = (self.accumulator & 0b10000000) >> 7;
+            self.status.carry = high_bit == 1;
+            self.accumulator = (self.accumulator << 1) | high_bit;
+            self.set_if_negative(self.accumulator);
+            self.set_if_zero(self.accumulator);
+        } else {
+            let high_bit = (operand & 0b10000000) >> 7;
+            self.status.carry = high_bit == 1;
+            let new_num = operand << 1;
+            self.bus.write(address, new_num);
+            self.set_if_negative(new_num);
+            self.set_if_zero(new_num);
+        }
+    }
+
+    pub fn ror(&mut self, address: u16, operand: u8, accumulator: bool) {
+        if accumulator {
+            let low_bit = self.accumulator & 0b1;
+            self.status.carry = low_bit == 1;
+            self.accumulator = (self.accumulator >> 1) | (low_bit << 7);
+            self.set_if_negative(self.accumulator);
+            self.set_if_zero(self.accumulator);
+        } else {
+            let low_bit = operand & 0b1;
+            self.status.carry = low_bit == 1;
+            let new_num = (operand >> 1) | (low_bit << 7);
+            self.bus.write(address, new_num);
+            self.set_if_negative(new_num);
+            self.set_if_zero(new_num);
+        }
+    }
+
+    // Flag instructions
+    pub fn clc(&mut self) {
+        self.staus.carry = false;
+    }
+
+    pub fn cld(&mut self) {
+        self.status.decimal = false;
+    }
+
+    pub fn cli(&mut self) {
+        self.status.interrupt = false;
+    }
+
+    pub fn clv(&mut self) {
+        self.status.overflow = false;
+    }
+
+    pub fn sec(&mut self) {
+        self.status.carry = true;
+    }
+
+    pub fn sed(&mut self) {
+        self.status.decimal = true;
+    }
+
+    pub fn sei(&mut self) {
+       self.status.interrupt = true;
+    }
+
+    // Branch instructions
+    pub fn bcc(&mut self, address: u16) {
+        if (!self.status.carry) {
+            self.program_counter = address;
+        }
+    }
+
+    pub fn bcs(&mut self, address: u16) {
+        if (self.status.carry) {
+            self.program_counter = address;
+        }
+    }
+
+    pub fn beq(&mut self, address: u16) {
+        if (self.status.zero) {
+            self.program_counter = address;
+        }
+    }
+
+    pub fn bmi(&mut self, address: u16) {
+        if (self.status.negative) {
+            self.program_counter = address;
+        }
+    }
+
+    pub fn bne(&mut self, address: u16) {
+        if (!self.status.zero) {
+            self.program_counter = address;
+        }
+    }
+
+    pub fn bpl(&mut self, address: u16) {
+        if (!self.status.negative) {
+            self.program_counter = address;
+        }
+    }
+
+    pub fn bvc(&mut self, address: u16) {
+        if (!self.status.overflow) {
+            self.program_counter = address;
+        }
+    }
+
+    pub fn bvs(&mut self, address: u16) {
+        if (self.status.overflow) {
+            self.program_counter = address;
+        }
+    }
 }
