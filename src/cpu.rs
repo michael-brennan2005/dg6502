@@ -184,6 +184,10 @@ impl StatusRegister {
            overflow: (x & 0b01000000) >> 6 == 1,
            _break: (x & 0b00100000) >> 5 == 1,
            decimal: (x & 0b00001000) >> 4 == 1,
+           pub fn push_to_stack(&mut self, x: u8) {
+
+           }
+
            interrupt: (x & 0b00000100) >> 3 == 1,
            zero: (x & 0b00000010) >> 2 == 1,
            carry: (x & 0b00000001) == 1
@@ -252,7 +256,9 @@ impl<T: bus::Bus> Cpu<T> {
     }
 
     pub fn fetch_operand(&mut self, address_mode: AddressMode) -> (u8, u16) {
-        match address_mode {
+ self.bus.write(self.stack_pointer as u16 + 0x100, self.accumulator);
+        self.stack_pointer -= 1;
+       match address_mode {
             AddressMode::Accumulator => {
                 (self.accumulator, 0)
             },
@@ -285,9 +291,11 @@ impl<T: bus::Bus> Cpu<T> {
             AddressMode::Implied => {
                 (0, 0)
             },
-            // only JMP uses this, and it does some weird 16 bit value thing. Do that in the instruction
             AddressMode::Indirect => {
-                (0, 0)
+                let low_byte = self.bus.read(self.program_counter + 1);
+                let high_byte = self.bus.read(self.program_counter + 2);
+                self.program_counter += 2;
+                (0, (high_byte as u16) << 8 | low_byte as u16)
             },
             AddressMode::IndirectXIndex => {
                 let byte = self.bus.read(self.program_counter + 1);
@@ -414,6 +422,16 @@ impl<T: bus::Bus> Cpu<T> {
         self.program_counter += 1;
     }
 
+    pub fn push_to_stack(&mut self, x: u8) {
+        self.bus.write(self.stack_pointer as u16 + 0x100, x);
+        self.stack_pointer -= 1;
+    }
+
+    pub fn pop_from_stack(&mut self) -> u8 {
+        let x = self.bus.read(self.stack_pointer as u16 + 0x100);
+        self.stack_pointer += 1;
+        x
+    }
     // Transfer instructions
 
     pub fn lda(&mut self, operand: u8) {
@@ -481,8 +499,8 @@ impl<T: bus::Bus> Cpu<T> {
    }
 
     // Stack instructions
-    pub fn pha(&mut self) {
-        self.bus.write(self.stack_pointer as u16 + 0x100, self.accumulator);
+    pub fn pha(&mut self, address: u16) {
+        self.bus.write(self.stack_poinself.program_counter = address; ter as u16 + 0x100, self.accumulator);
         self.stack_pointer -= 1;
     }
 
@@ -715,5 +733,22 @@ impl<T: bus::Bus> Cpu<T> {
         if (self.status.overflow) {
             self.program_counter = address;
         }
+    }
+
+    pub fn jmp(&mut self, address: u16) {
+        self.program_counter = address;
+    }
+
+    pub fn jsr(&mut self, address: u16) {
+        let high_byte = ((self.program_counter + 2) >> 8) as u8;
+        let low_byte = ((self.program_counter + 2) & 0b00001111) as u8;
+        self.push_to_stack(high_byte);
+        self.push_to_stack(low_byte);
+
+        self.program_counter = address;
+    }
+
+    pub fn rts(&mut self) {
+
     }
 }
