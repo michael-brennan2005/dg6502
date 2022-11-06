@@ -252,8 +252,6 @@ impl<T: bus::Bus> Cpu<T> {
     }
 
     pub fn fetch_operand(&mut self, address_mode: AddressMode) -> (u8, u16) {
-        self.bus.write(self.stack_pointer as u16 + 0x100, self.accumulator);
-        self.stack_pointer -= 1;
         match address_mode {
             AddressMode::Accumulator => {
                 (self.accumulator, 0)
@@ -358,7 +356,7 @@ impl<T: bus::Bus> Cpu<T> {
         let (operand, address) = self.fetch_operand(address_mode);
 
         match opcode {
-            Instruction::ADC => self.adc(address, operand),
+            Instruction::ADC => self.adc(operand),
             Instruction::AND => self.and(operand),
             Instruction::ASL => self.asl(address, operand, true),
             Instruction::BCC => self.bcc(address),
@@ -401,7 +399,7 @@ impl<T: bus::Bus> Cpu<T> {
             Instruction::ROR => self.ror(address, operand, true),
             Instruction::RTS => self.rts(),
             Instruction::RTI => self.rti(),
-            Instruction::SBC => self.sbc(address, operand),
+            Instruction::SBC => self.sbc(operand),
             Instruction::SEC => self.sec(),
             Instruction::SED => self.sed(),
             Instruction::SEI => self.sei(),
@@ -559,18 +557,20 @@ impl<T: bus::Bus> Cpu<T> {
     // Arithmetic operations
     pub fn adc(&mut self, operand: u8) {
         let result = (operand as u16) + (self.accumulator as u16);
-        self.status.carry = !(0 <= result && result <= 255);
-        self.status.overflow = -128 <= (result as i16) && (result as i16) <= 127;
+        self.status.carry = !(result <= 255);
+        self.status.overflow = (operand ^ result as u8) & (self.accumulator ^ result as u8) & 0x80 != 0;
         self.status.zero = result == 0;
         self.status.negative = (result as i8) < 0;
+        self.accumulator = result as u8;
     }
 
     pub fn sbc(&mut self, operand: u8) {
-        let result = (operand as i16) - (self.accumulator as i16);
-        self.status.carry = 0 <= result && result <= 255;
-        self.status.overflow = -128 <= (result as i16) && (result as i16) <= 127;
-        self.status.zero = result == 0;
-        self.status.negative = (result as i8) < 0;
+        let result: u16 = (self.accumulator as u16).wrapping_sub(operand as u16).wrapping_sub(if self.status.carry { 0 } else { 1 });
+        self.status.negative = (result & 0x80) != 0;
+        self.status.zero = (result & 0xFF) == 0;
+        self.status.overflow = ((self.accumulator ^ result as u8) & 0x80 != 0) && ((self.accumulator ^ operand) & 0x80 != 0);
+        self.status.carry = result < 0x100;
+        self.accumulator = (result & 0xFF) as u8;
     }
 
     // Logical operations
@@ -810,5 +810,52 @@ impl<T: bus::Bus> Cpu<T> {
 
     pub fn nop(&mut self) {
         // its noping time!
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::bus::{BasicBus, Bus};
+
+    use super::Cpu;
+
+    fn helper<T: Bus>(cpu: &mut Cpu<T>, function: fn(&mut Cpu<T>, u8), first: u8, second: u8, accumulator: u8, negative: bool, overflow: bool, zero: bool, carry: bool) {
+        cpu.accumulator = first;
+        function(cpu, second);
+        assert_eq!(cpu.accumulator, accumulator);
+        assert_eq!(cpu.status.negative, negative);
+        assert_eq!(cpu.status.zero, zero);
+        assert_eq!(cpu.status.carry, carry);
+        assert_eq!(cpu.status.overflow, overflow);
+    }
+
+    fn adc_helper<T: Bus>(cpu: &mut Cpu<T>, first: u8, second: u8, accumulator: u8, negative: bool, overflow: bool, zero: bool, carry: bool) {
+        helper(cpu, Cpu::adc, first, second, accumulator, negative, overflow, zero, carry);
+    }
+
+    #[test]
+    fn adc() {
+        let mut cpu = Cpu::new(BasicBus::try_from(vec![0]).unwrap());
+
+        adc_helper(&mut cpu, 0x1, 0x3, 0x4, false, false, false, false);
+        adc_helper(&mut cpu, 0x5, 0x9C, 0xA1, true, false, false, false);
+        adc_helper(&mut cpu, 0xB3, 0x37, 0xEA, true, false, false, false);
+        adc_helper(&mut cpu, 0xAF, 0xEF, 0x9E, true, false, false, true);
+        adc_helper(&mut cpu, 0x0, 0x0, 0x0, false, false, true, false);
+        adc_helper(&mut cpu, 0xFF, 0xFF, 0xFE, true, false, false, true);
+        adc_helper(&mut cpu, 0x7F, 0x01, 0x80, true, true, false, false);
+    }
+
+    fn sbc_helper<T: Bus>(cpu: &mut Cpu<T>, first: u8, second: u8, accumulator: u8, negative: bool, overflow: bool, zero: bool, carry: bool) {
+       helper(cpu, Cpu::sbc, first, second, accumulator, negative, overflow, zero, carry);
+    }
+
+    #[test]
+    fn sbc() {
+        let mut cpu = Cpu::new(BasicBus::try_from(vec![0]).unwrap());
+
+        sbc_helper(&mut cpu, 0x96, 0xAB, 0xEA, true, false, false, false);
+        sbc_helper(&mut cpu, 0x1F, 0xA3, 0x7B, false, false, false, false);
+        sbc_helper(&mut cpu, 0xEB, 0x10, 0xDA, true, false, false, true);
     }
 }

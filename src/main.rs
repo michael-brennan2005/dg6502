@@ -14,8 +14,4 @@ fn main() {
     let bus = bus::BasicBus::try_from(buffer).unwrap();
     let mut cpu6502 = cpu::Cpu::new(bus);
 
-    cpu6502.reset();
-    while (cpu6502.program_counter < 16) {
-        cpu6502.step();
-    }
 }
