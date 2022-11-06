@@ -1,4 +1,4 @@
-use std::{str::FromStr, ops::Sub};
+use std::str::FromStr;
 
 use ndarray::Array2;
 use strum_macros::EnumString;
@@ -184,10 +184,6 @@ impl StatusRegister {
            overflow: (x & 0b01000000) >> 6 == 1,
            _break: (x & 0b00100000) >> 5 == 1,
            decimal: (x & 0b00001000) >> 4 == 1,
-           pub fn push_to_stack(&mut self, x: u8) {
-
-           }
-
            interrupt: (x & 0b00000100) >> 3 == 1,
            zero: (x & 0b00000010) >> 2 == 1,
            carry: (x & 0b00000001) == 1
@@ -240,7 +236,7 @@ impl<T: bus::Bus> Cpu<T> {
     }
 
     pub fn set_if_zero(&mut self, operand: u8) {
-        if (self.operand == 0) {
+        if operand == 0 {
             self.status.zero = true;
         } else {
             self.status.zero = false;
@@ -248,7 +244,7 @@ impl<T: bus::Bus> Cpu<T> {
     }
 
     pub fn set_if_negative(&mut self, operand: u8) {
-        if ((operand & 0x80) >> 7 == 1) {
+        if (operand & 0x80) >> 7 == 1 {
             self.status.negative = true;
         } else {
             self.status.negative = false;
@@ -256,9 +252,9 @@ impl<T: bus::Bus> Cpu<T> {
     }
 
     pub fn fetch_operand(&mut self, address_mode: AddressMode) -> (u8, u16) {
- self.bus.write(self.stack_pointer as u16 + 0x100, self.accumulator);
+        self.bus.write(self.stack_pointer as u16 + 0x100, self.accumulator);
         self.stack_pointer -= 1;
-       match address_mode {
+        match address_mode {
             AddressMode::Accumulator => {
                 (self.accumulator, 0)
             },
@@ -359,65 +355,65 @@ impl<T: bus::Bus> Cpu<T> {
 
         let opcode = Instruction::from_str(instruction[0]).unwrap();
         let address_mode = AddressMode::from_str(instruction[1]).unwrap();
-        let operand = self.fetch_operand(address_mode);
+        let (operand, address) = self.fetch_operand(address_mode);
 
         match opcode {
-            Instruction::ADC => self.adc(operand),
+            Instruction::ADC => self.adc(address, operand),
             Instruction::AND => self.and(operand),
-            Instruction::ASL => self.asl(operand),
-            Instruction::BCC => self.bcc(operand),
-            Instruction::BCS => self.bcs(operand),
-            Instruction::BEQ => self.beq(operand),
+            Instruction::ASL => self.asl(address, operand, true),
+            Instruction::BCC => self.bcc(address),
+            Instruction::BCS => self.bcs(address),
+            Instruction::BEQ => self.beq(address),
             Instruction::BIT => self.bit(operand),
-            Instruction::BMI => self.bmi(operand),
-            Instruction::BNE => self.bne(operand),
-            Instruction::BPL => self.bpl(operand),
-            Instruction::BRK => self.brk(operand),
-            Instruction::BVC => self.bvc(operand),
-            Instruction::BVS => self.bvs(operand),
-            Instruction::CLC => self.clc(operand),
-            Instruction::CLD => self.cld(operand),
-            Instruction::CLI => self.cli(operand),
-            Instruction::CLV => self.clv(operand),
+            Instruction::BMI => self.bmi(address),
+            Instruction::BNE => self.bne(address),
+            Instruction::BPL => self.bpl(address),
+            Instruction::BRK => self.brk(address),
+            Instruction::BVC => self.bvc(address),
+            Instruction::BVS => self.bvs(address),
+            Instruction::CLC => self.clc(),
+            Instruction::CLD => self.cld(),
+            Instruction::CLI => self.cli(),
+            Instruction::CLV => self.clv(),
             Instruction::CMP => self.cmp(operand),
             Instruction::CPX => self.cpx(operand),
             Instruction::CPY => self.cpy(operand),
-            Instruction::DEC => self.dec(operand),
-            Instruction::DEX => self.dex(operand),
-            Instruction::DEY => self.dey(operand),
+            Instruction::DEC => self.dec(address, operand),
+            Instruction::DEX => self.dex(),
+            Instruction::DEY => self.dey(),
             Instruction::EOR => self.eor(operand),
-            Instruction::INC => self.inc(operand),
-            Instruction::INX => self.inx(operand),
-            Instruction::INY => self.iny(operand),
-            Instruction::JMP => self.jmp(operand),
-            Instruction::JSR => self.jsr(operand),
+            Instruction::INC => self.inc(address, operand),
+            Instruction::INX => self.inx(),
+            Instruction::INY => self.iny(),
+            Instruction::JMP => self.jmp(address),
+            Instruction::JSR => self.jsr(address),
             Instruction::LDA => self.lda(operand),
             Instruction::LDX => self.ldx(operand),
             Instruction::LDY => self.ldy(operand),
-            Instruction::LSR => self.lsr(operand),
-            Instruction::NOP => self.nop(operand),
+            Instruction::LSR => self.lsr(address, operand, true),
+            Instruction::NOP => self.nop(),
             Instruction::ORA => self.ora(operand),
-            Instruction::PHA => self.pha(operand),
-            Instruction::PHP => self.php(operand),
-            Instruction::PLA => self.pla(operand),
-            Instruction::PLP => self.plp(operand),
-            Instruction::ROL => self.rol(operand),
-            Instruction::ROR => self.ror(operand),
-            Instruction::RTS => self.rts(operand),
-            Instruction::RTI => self.rti(operand),
-            Instruction::SBC => self.sbc(operand),
-            Instruction::SEC => self.sec(operand),
-            Instruction::SED => self.sed(operand),
-            Instruction::SEI => self.sei(operand),
-            Instruction::STA => self.sta(operand),
-            Instruction::STX => self.stx(operand),
-            Instruction::STY => self.sty(operand),
-            Instruction::TAX => self.tax(operand),
-            Instruction::TAY => self.tay(operand),
-            Instruction::TSX => self.tsx(operand),
-            Instruction::TXA => self.txa(operand),
-            Instruction::TXS => self.txs(operand),
-            Instruction::TYA => self.tya(operand),
+            Instruction::PHA => self.pha(),
+            Instruction::PHP => self.php(),
+            Instruction::PLA => self.pla(),
+            Instruction::PLP => self.plp(),
+            Instruction::ROL => self.rol(address, operand, true),
+            Instruction::ROR => self.ror(address, operand, true),
+            Instruction::RTS => self.rts(),
+            Instruction::RTI => self.rti(),
+            Instruction::SBC => self.sbc(address, operand),
+            Instruction::SEC => self.sec(),
+            Instruction::SED => self.sed(),
+            Instruction::SEI => self.sei(),
+            Instruction::STA => self.sta(address),
+            Instruction::STX => self.stx(address),
+            Instruction::STY => self.sty(address),
+            Instruction::TAX => self.tax(),
+            Instruction::TAY => self.tay(),
+            Instruction::TSX => self.tsx(),
+            Instruction::TXA => self.txa(),
+            Instruction::TXS => self.txs(),
+            Instruction::TYA => self.tya(),
         }
         self.program_counter += 1;
     }
@@ -499,13 +495,13 @@ impl<T: bus::Bus> Cpu<T> {
    }
 
     // Stack instructions
-    pub fn pha(&mut self, address: u16) {
-        self.bus.write(self.stack_poinself.program_counter = address; ter as u16 + 0x100, self.accumulator);
+    pub fn pha(&mut self) {
+        self.push_to_stack(self.accumulator);
         self.stack_pointer -= 1;
     }
 
     pub fn php(&mut self) {
-        self.bus.write(self.stack_pointer as u16 + 0x100, self.status.to_u8() | (0x0011000));
+        self.bus.write(self.stack_pointer as u16 + 0x100, self.status.to_u8() | (0b0011000));
         self.stack_pointer -= 1;
     }
 
@@ -561,12 +557,20 @@ impl<T: bus::Bus> Cpu<T> {
     }
 
     // Arithmetic operations
-    pub fn adc(&mut self, address: u16, operand: u8) {
-
+    pub fn adc(&mut self, operand: u8) {
+        let result = (operand as u16) + (self.accumulator as u16);
+        self.status.carry = !(0 <= result && result <= 255);
+        self.status.overflow = -128 <= (result as i16) && (result as i16) <= 127;
+        self.status.zero = result == 0;
+        self.status.negative = (result as i8) < 0;
     }
 
-    pub fn sbc(&mut self, address: u16, operand: u8) {
-
+    pub fn sbc(&mut self, operand: u8) {
+        let result = (operand as i16) - (self.accumulator as i16);
+        self.status.carry = 0 <= result && result <= 255;
+        self.status.overflow = -128 <= (result as i16) && (result as i16) <= 127;
+        self.status.zero = result == 0;
+        self.status.negative = (result as i8) < 0;
     }
 
     // Logical operations
@@ -659,7 +663,7 @@ impl<T: bus::Bus> Cpu<T> {
 
     // Flag instructions
     pub fn clc(&mut self) {
-        self.staus.carry = false;
+        self.status.carry = false;
     }
 
     pub fn cld(&mut self) {
@@ -686,55 +690,69 @@ impl<T: bus::Bus> Cpu<T> {
        self.status.interrupt = true;
     }
 
+    // Comparisons
+    pub fn cmp(&mut self, operand: u8) {
+        todo!()
+    }
+
+    pub fn cpx(&mut self, operand: u8) {
+        todo!()
+    }
+
+    pub fn cpy(&mut self, operand: u8) {
+        todo!()
+    }
+
     // Branch instructions
     pub fn bcc(&mut self, address: u16) {
-        if (!self.status.carry) {
+        if !self.status.carry {
             self.program_counter = address;
         }
     }
 
     pub fn bcs(&mut self, address: u16) {
-        if (self.status.carry) {
+        if self.status.carry {
             self.program_counter = address;
         }
     }
 
     pub fn beq(&mut self, address: u16) {
-        if (self.status.zero) {
+        if self.status.zero {
             self.program_counter = address;
         }
     }
 
     pub fn bmi(&mut self, address: u16) {
-        if (self.status.negative) {
+        if self.status.negative {
             self.program_counter = address;
         }
     }
 
     pub fn bne(&mut self, address: u16) {
-        if (!self.status.zero) {
+        if !self.status.zero {
             self.program_counter = address;
         }
     }
 
     pub fn bpl(&mut self, address: u16) {
-        if (!self.status.negative) {
+        if !self.status.negative {
             self.program_counter = address;
         }
     }
 
     pub fn bvc(&mut self, address: u16) {
-        if (!self.status.overflow) {
+        if !self.status.overflow {
             self.program_counter = address;
         }
     }
 
     pub fn bvs(&mut self, address: u16) {
-        if (self.status.overflow) {
+        if self.status.overflow {
             self.program_counter = address;
         }
     }
 
+    // Jump instructions
     pub fn jmp(&mut self, address: u16) {
         self.program_counter = address;
     }
@@ -749,6 +767,48 @@ impl<T: bus::Bus> Cpu<T> {
     }
 
     pub fn rts(&mut self) {
+        let low_byte = self.pop_from_stack();
+        let high_byte = self.pop_from_stack();
+        self.program_counter = ((high_byte as u16) << 8) | (low_byte as u16);
+    }
 
+    // Interrupts
+    pub fn brk(&mut self, address: u16) {
+        self.program_counter += 2;
+        let high_byte = (self.program_counter >> 8) as u8;
+        let low_byte = (self.program_counter & 0xFF) as u8;
+        self.push_to_stack(high_byte);
+        self.push_to_stack(low_byte);
+        self.status._break = true;
+        self.push_to_stack(self.status.to_u8());
+
+        let new_high_byte = self.bus.read(0xFFFF);
+        let new_low_byte = self.bus.read(0xFFFE);
+        let pc = ((new_high_byte as u16) << 8) | new_low_byte as u16;
+        self.program_counter = pc;
+    }
+
+    pub fn rti(&mut self) {
+        let mut status = StatusRegister::from_u8(self.pop_from_stack());
+        status._break = false;
+
+        let low_byte = self.pop_from_stack();
+        let high_byte = self.pop_from_stack();
+        let program_counter = ((high_byte as u16) << 8) | low_byte as u16;
+
+        self.status = status;
+        self.program_counter = program_counter;
+    }
+
+    // Other
+    pub fn bit(&mut self, operand: u8) {
+        self.status.negative = (operand & 0b10000000 >> 7) == 1;
+        self.status.overflow = (operand & 0b01000000 >> 6) == 1;
+
+        self.status.zero = (operand & self.accumulator) > 0;
+    }
+
+    pub fn nop(&mut self) {
+        // its noping time!
     }
 }
