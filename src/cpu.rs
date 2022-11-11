@@ -152,7 +152,7 @@ pub enum AddressMode {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct StatusRegister {
+pub struct StatusRegister {
     negative: bool,
     overflow: bool,
     _break: bool,
@@ -193,13 +193,13 @@ impl StatusRegister {
 
 pub struct Cpu<T: bus::Bus> {
     pub program_counter: u16,
-    accumulator: u8,
-    x: u8,
-    y: u8,
-    status: StatusRegister,
-    stack_pointer: u8,
-    bus: T,
-    lookup_table: Array2<&'static str>
+    pub accumulator: u8,
+    pub x: u8,
+    pub y: u8,
+    pub status: StatusRegister,
+    pub stack_pointer: u8,
+    pub bus: T,
+    pub lookup_table: Array2<&'static str>
 }
 
 impl<T: bus::Bus> Cpu<T> {
