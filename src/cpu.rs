@@ -224,7 +224,7 @@ impl<T: bus::Bus> Cpu<T> {
         ]);
 
         Cpu {
-            program_counter: 0,
+            program_counter: 0x400,
             accumulator: 0,
             x: 0,
             y: 0,
@@ -244,11 +244,7 @@ impl<T: bus::Bus> Cpu<T> {
     }
 
     pub fn set_if_negative(&mut self, operand: u8) {
-        if (operand & 0x80) >> 7 == 1 {
-            self.status.negative = true;
-        } else {
-            self.status.negative = false;
-        }
+        self.status.negative = (operand as i8) < 0;
     }
 
     pub fn fetch_operand(&mut self, address_mode: AddressMode) -> (u8, u16) {
@@ -351,7 +347,13 @@ impl<T: bus::Bus> Cpu<T> {
 
         let instruction = self.lookup_table.get([high_nibble as usize, low_nibble as usize]).unwrap().split(" ").collect::<Vec<&str>>();
 
-        let opcode = Instruction::from_str(instruction[0]).unwrap();
+        let opcode = match Instruction::from_str(instruction[0]) {
+            Ok(a) => a,
+            Err(_) => {
+                println!("{} {}", instruction[0], instruction[1]);
+                panic!();
+            }
+        };
         let address_mode = AddressMode::from_str(instruction[1]).unwrap();
         let (operand, address) = self.fetch_operand(address_mode);
 
@@ -754,7 +756,8 @@ impl<T: bus::Bus> Cpu<T> {
 
     // Jump instructions
     pub fn jmp(&mut self, address: u16) {
-        self.program_counter = address;
+        // step is always incrementing, so if we dont decrement address will be one off what it should be.
+        self.program_counter = address - 1;
     }
 
     pub fn jsr(&mut self, address: u16) {

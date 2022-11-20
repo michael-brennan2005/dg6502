@@ -35,3 +35,13 @@ impl Bus for BasicBus {
         self.buffer[address as usize] = data;
     }
 }
+
+impl BasicBus {
+    pub fn swap_buffer(&mut self, new_buffer: Vec<u8>) { 
+        let mut buffer: Vec<u8> = vec![0; 65536];
+        for (index, ele) in new_buffer.iter().enumerate() {
+            buffer[index] = *ele;
+        }
+        self.buffer = buffer;
+    }
+}
