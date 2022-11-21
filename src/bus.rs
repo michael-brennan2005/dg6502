@@ -10,6 +10,12 @@ pub struct BasicBus {
 }
 
 
+impl Default for BasicBus {
+    fn default() -> Self {
+        BasicBus { buffer: vec![0; 65536] }
+    }
+}
+
 impl TryFrom<Vec<u8>> for BasicBus {
     type Error = ();
 
@@ -36,12 +42,33 @@ impl Bus for BasicBus {
     }
 }
 
-impl BasicBus {
-    pub fn swap_buffer(&mut self, new_buffer: Vec<u8>) { 
-        let mut buffer: Vec<u8> = vec![0; 65536];
-        for (index, ele) in new_buffer.iter().enumerate() {
-            buffer[index] = *ele;
+pub struct NESTestBus {
+    buffer: Vec<u8>
+}
+
+impl TryFrom<Vec<u8>> for NESTestBus {
+    type Error = ();
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        if value.len() > 65536 {
+            Err(())
+        } else {
+            let mut buffer = vec![0; 65536];
+            for i in 0x10..(0x10 + 16384) {
+                buffer[0xC000 + (i - 0x10)] = value[i];
+            }
+
+            Ok(NESTestBus { buffer })
         }
-        self.buffer = buffer;
+    }
+}
+
+impl Bus for NESTestBus {
+    fn read(&self, address: u16) -> u8 {
+        self.buffer[address as usize]
+    }
+
+    fn write(&mut self, address: u16, data: u8) {
+        self.buffer[address as usize] = data;
     }
 }
