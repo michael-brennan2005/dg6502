@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use ndarray::Array2;
+use ndarray::{Array2, stack};
 use strum_macros::EnumString;
 
 use crate::bus;
@@ -297,7 +297,20 @@ impl<T: bus::Bus> Cpu<T> {
                 let low_byte = self.bus.read(self.program_counter + 1);
                 let high_byte = self.bus.read(self.program_counter + 2);
                 self.program_counter = self.program_counter.wrapping_add(2);
-                (0, (high_byte as u16) << 8 | low_byte as u16)
+                let address = (u16::from(high_byte) << 8) | u16::from(low_byte);
+                // page boundary bug
+                if address & 0xFF == 0xFF {
+                    let low_byte = self.bus.read(address);
+                    let high_byte = self.bus.read(address & 0xFF00);
+                    let indirect = (u16::from(high_byte) << 8) | u16::from(low_byte);
+                    (0,indirect)
+                } else {
+                    let low_byte = self.bus.read(address);
+                    let high_byte = self.bus.read(address.wrapping_add(1));
+                    let indirect = (u16::from(high_byte) << 8) | u16::from(low_byte);
+                    (0,indirect)
+                }
+                
             },
             AddressMode::IndirectXIndex => {
                 let byte = self.bus.read(self.program_counter.wrapping_add(1));
@@ -328,17 +341,17 @@ impl<T: bus::Bus> Cpu<T> {
             AddressMode::Zeropage => {
                 let low_byte = self.bus.read(self.program_counter.wrapping_add(1));
                 self.program_counter = self.program_counter.wrapping_add(1);
-                (self.bus.read(low_byte as u16), self.program_counter)
+                (self.bus.read(low_byte as u16), low_byte as u16)
             },
             AddressMode::ZeropageXIndex => {
                 let low_byte = self.bus.read(self.program_counter.wrapping_add(1));
                 self.program_counter = self.program_counter.wrapping_add(1);
-                (self.bus.read(low_byte as u16 + self.x as u16), low_byte as u16 + self.x as u16)
+                (self.bus.read(self.x.wrapping_add(low_byte) as u16), self.x.wrapping_add(low_byte) as u16)
             },
             AddressMode::ZeropageYIndex => {
                 let low_byte = self.bus.read(self.program_counter + 1);
                 self.program_counter = self.program_counter.wrapping_add(1);
-                (self.bus.read(low_byte as u16 + self.y as u16), low_byte as u16 + self.y as u16)
+                (self.bus.read(self.y.wrapping_add(low_byte) as u16), self.y.wrapping_add(low_byte) as u16)
             },
         }
 
@@ -373,7 +386,10 @@ impl<T: bus::Bus> Cpu<T> {
         match opcode {
             Instruction::ADC => self.adc(operand),
             Instruction::AND => self.and(operand),
-            Instruction::ASL => self.asl(address, operand, true),
+            Instruction::ASL => match address_mode {
+                AddressMode::Accumulator => self.asl(address, operand, true),
+                _ => self.asl(address, operand, false)
+            },
             Instruction::BCC => self.bcc(address),
             Instruction::BCS => self.bcs(address),
             Instruction::BEQ => self.beq(address),
@@ -403,15 +419,24 @@ impl<T: bus::Bus> Cpu<T> {
             Instruction::LDA => self.lda(operand),
             Instruction::LDX => self.ldx(operand),
             Instruction::LDY => self.ldy(operand),
-            Instruction::LSR => self.lsr(address, operand, true),
+            Instruction::LSR => match address_mode {
+                AddressMode::Accumulator => self.lsr(address, operand, true),
+                _ => self.lsr(address, operand, false)
+            },
             Instruction::NOP => self.nop(),
             Instruction::ORA => self.ora(operand),
             Instruction::PHA => self.pha(),
             Instruction::PHP => self.php(),
             Instruction::PLA => self.pla(),
             Instruction::PLP => self.plp(),
-            Instruction::ROL => self.rol(address, operand, true),
-            Instruction::ROR => self.ror(address, operand, true),
+            Instruction::ROL => match address_mode {
+                AddressMode::Accumulator => self.rol(address, operand, true),
+                _ => self.rol(address, operand, false)
+            },
+            Instruction::ROR => match address_mode {
+                AddressMode::Accumulator => self.ror(address, operand, true),
+                _ => self.ror(address, operand, false)
+            },
             Instruction::RTS => self.rts(),
             Instruction::RTI => self.rti(),
             Instruction::SBC => self.sbc(operand),
@@ -539,12 +564,10 @@ impl<T: bus::Bus> Cpu<T> {
     // Stack instructions
     pub fn pha(&mut self) {
         self.push_to_stack(self.accumulator);
-        self.stack_pointer = self.stack_pointer.wrapping_sub(1);
     }
 
     pub fn php(&mut self) {
-        self.bus.write(self.stack_pointer as u16 + 0x100, self.status.to_u8() | (0b0011000));
-        self.stack_pointer = self.stack_pointer.wrapping_sub(1);
+        self.push_to_stack(self.status.to_u8() | (0b00110000));
     }
 
     pub fn pla(&mut self) {
@@ -557,8 +580,11 @@ impl<T: bus::Bus> Cpu<T> {
 
 
     pub fn plp(&mut self) {
-        self.stack_pointer = self.stack_pointer.wrapping_add(1);
-        self.status = StatusRegister::from_u8(self.bus.read(self.stack_pointer as u16 + 0x100) & !(0b00110000));
+        let stack_status = self.pop_from_stack();
+        let current_status = self.status.to_u8();
+        
+        let new_status = (stack_status & 0b11001111) | (current_status & 0b00110000);
+        self.status = StatusRegister::from_u8(new_status);
     }
 
     // Decrements & increments
@@ -600,34 +626,49 @@ impl<T: bus::Bus> Cpu<T> {
 
     // Arithmetic operations
     pub fn adc(&mut self, operand: u8) {
-        let mut result: u16 = operand as u16 + self.accumulator as u16 + self.status.carry as u16;
-        self.status.zero = (result & 0xFF) == 0;
+        let mut result: u16 = u16::from(self.accumulator) + u16::from(operand) + u16::from(self.status.carry);
         if self.status.decimal {
-            if (self.accumulator & 0xF) + (operand & 0xF) + self.status.carry as u8 > 9 {
-                result += 6;
-            } 
-            self.status.negative = (result & 0x80) >> 7 == 1;
-            self.status.overflow = (operand ^ result as u8) & (self.accumulator ^ result as u8) & 0x80 != 0;
-            if result > 0x99 {
-                result = result.wrapping_add(96);
-            } 
-            self.status.carry = result > 0x99;
+            let mut sum = (self.accumulator & 0xF) + (operand & 0xF) + u8::from(self.status.carry);
+            if sum >= 0xA {
+                sum = ((sum + 0x6) & 0xF) + 0x10;
+            }
+            let mut sum = u16::from(self.accumulator & 0xF0) + u16::from(operand & 0xF0) + u16::from(sum);
+            self.status.zero = result & 0xFF == 0;
+            self.status.negative = (sum & 0x80) > 0;
+            self.status.overflow = (!(self.accumulator ^ operand) & (self.accumulator ^ sum as u8) & 0x80) > 0;
+            if sum >= 0xA0 {
+                sum += 0x60;
+            }
+            self.status.carry = sum >= 0x100;
+            result = sum & 0xFF;
         } else {
-            self.status.negative = (result & 0x80) >> 7 == 1;
-            self.status.overflow = (operand ^ result as u8) & (self.accumulator ^ result as u8) & 0x80 != 0;
-            self.status.carry = result > 0xFF;
+            self.status.carry = result > u16::from(u8::max_value());
+            self.status.zero = result as u8 == 0;
+            self.status.overflow = (!(self.accumulator ^ operand) & (self.accumulator ^ result as u8) & 0x80) > 0;
+            self.status.negative = (result as u8 & 0x80) > 0;
         }
-
-        self.accumulator = (result & 0xFF) as u8;
+        self.accumulator = result as u8;
     }
 
     pub fn sbc(&mut self, operand: u8) {
-        let result: u16 = (self.accumulator as u16).wrapping_sub(operand as u16).wrapping_sub(if self.status.carry { 0 } else { 1 });
-        self.status.negative = (result & 0x80) != 0;
-        self.status.zero = (result & 0xFF) == 0;
-        self.status.overflow = ((self.accumulator ^ result as u8) & 0x80 != 0) && ((self.accumulator ^ operand) & 0x80 != 0);
-        self.status.carry = result < 0x100;
-        self.accumulator = (result & 0xFF) as u8;
+        let mut result = u16::from(self.accumulator) + u16::from(!operand) + self.status.carry as u16;
+        self.status.carry = result > u16::from(u8::max_value());
+        self.status.zero = result as u8 == 0;
+        self.status.overflow = ((self.accumulator ^ operand) & (self.accumulator ^ result as u8) & 0x80) > 0;
+        self.status.negative = (result as u8 & 0x80) > 0;
+        if self.status.decimal {
+            let operand = operand as i16;
+            let mut sum = (self.accumulator & 0xF) as i16 - (operand & 0xF) + self.status.carry as i16 - 1;
+            if sum < 0 {
+                sum = ((sum - 0x6) & 0xF) - 0x10;
+            }
+            let mut sum = (self.accumulator & 0xF0) as i16 - (operand & 0xF0) + sum;
+            if sum < 0 {
+                sum -= 0x60;
+            }
+            result = (sum & 0xFF) as u16;
+        }
+        self.accumulator = result as u8;
     }
 
     // Logical operations
@@ -652,31 +693,27 @@ impl<T: bus::Bus> Cpu<T> {
     // Shift & rotate instructions
     pub fn asl(&mut self, address: u16, operand: u8, accumulator: bool) {
         if accumulator {
-            let high_bit = (self.accumulator & 0b10000000) >> 7;
-            self.status.carry = high_bit == 1;
+            self.status.carry = self.accumulator >> 7 == 1;
             self.accumulator = self.accumulator << 1;
-            self.set_if_negative(self.accumulator);
-            self.set_if_zero(self.accumulator);
+            self.status.negative = self.accumulator & 0x80 > 0;
+            self.status.zero = self.accumulator == 0;
         } else {
-            let high_bit = (operand & 0b10000000) >> 7;
-            self.status.carry = high_bit == 1;
+            self.status.carry = operand >> 7 == 1;
             let new_num = operand << 1;
             self.bus.write(address, new_num);
-            self.set_if_negative(new_num);
-            self.set_if_zero(new_num);
+            self.status.negative = new_num & 0x80 > 0;
+            self.status.zero = new_num == 0;
         }
     }
 
     pub fn lsr(&mut self, address: u16, operand: u8, accumulator: bool) {
         if accumulator {
-            let low_bit = self.accumulator & 0b1;
-            self.status.carry = low_bit == 1;
+            self.status.carry = self.accumulator & 0b1 == 1;
             self.accumulator = self.accumulator >> 1;
             self.set_if_negative(self.accumulator);
             self.set_if_zero(self.accumulator);
         } else {
-            let low_bit = (operand & 0b10000000) >> 7;
-            self.status.carry = low_bit == 1;
+            self.status.carry = operand & 0b1 == 1;
             let new_num = operand >> 1;
             self.bus.write(address, new_num);
             self.set_if_negative(new_num);
@@ -686,35 +723,35 @@ impl<T: bus::Bus> Cpu<T> {
 
     pub fn rol(&mut self, address: u16, operand: u8, accumulator: bool) {
         if accumulator {
-            let high_bit = (self.accumulator & 0b10000000) >> 7;
-            self.status.carry = high_bit == 1;
-            self.accumulator = (self.accumulator << 1) | high_bit;
-            self.set_if_negative(self.accumulator);
-            self.set_if_zero(self.accumulator);
+            let carry = self.status.carry;
+            self.status.carry = (self.accumulator >> 7) == 1;
+            self.accumulator = (self.accumulator << 1) + carry as u8;
+            self.status.negative = self.accumulator & 0x80 > 0;
+            self.status.zero = self.accumulator == 0;
         } else {
-            let high_bit = (operand & 0b10000000) >> 7;
-            self.status.carry = high_bit == 1;
-            let new_num = operand << 1;
-            self.bus.write(address, new_num);
-            self.set_if_negative(new_num);
-            self.set_if_zero(new_num);
+            let carry = self.status.carry;
+            self.status.carry = (operand >> 7) == 1;
+            let new = (operand << 1) + carry as u8;
+            self.bus.write(address, new);
+            self.status.negative = new & 0x80 > 0;
+            self.status.zero = new == 0;
         }
     }
 
     pub fn ror(&mut self, address: u16, operand: u8, accumulator: bool) {
         if accumulator {
-            let low_bit = self.accumulator & 0b1;
-            self.status.carry = low_bit == 1;
-            self.accumulator = (self.accumulator >> 1) | (low_bit << 7);
-            self.set_if_negative(self.accumulator);
-            self.set_if_zero(self.accumulator);
+            let carry = self.status.carry as u8;
+            self.status.carry = (self.accumulator & 1) == 1;
+            self.accumulator = (self.accumulator >> 1) + (carry << 7);
+            self.status.negative = self.accumulator & 0x80 > 0;
+            self.status.zero = self.accumulator == 0;
         } else {
-            let low_bit = operand & 0b1;
-            self.status.carry = low_bit == 1;
-            let new_num = (operand >> 1) | (low_bit << 7);
-            self.bus.write(address, new_num);
-            self.set_if_negative(new_num);
-            self.set_if_zero(new_num);
+            let carry = self.status.carry as u8;
+            self.status.carry = (operand & 1) == 1;
+            let new = (operand >> 1) + (carry << 7);
+            self.bus.write(address, new);
+            self.status.negative = new & 0x80 > 0;
+            self.status.zero = new == 0;
         }
     }
 
@@ -812,7 +849,7 @@ impl<T: bus::Bus> Cpu<T> {
     // Jump instructions
     pub fn jmp(&mut self, address: u16) {
         // step is always incrementing, so if we dont decrement address will be one off what it should be.
-        self.program_counter = address - 1;
+        self.program_counter = address.wrapping_sub(1);
     }
 
     pub fn jsr(&mut self, address: u16) {
@@ -862,10 +899,10 @@ impl<T: bus::Bus> Cpu<T> {
 
     // Other
     pub fn bit(&mut self, operand: u8) {
-        self.status.negative = (operand & 0b10000000 >> 7) == 1;
-        self.status.overflow = (operand & 0b01000000 >> 6) == 1;
+        self.status.negative = (operand & 0b10000000) > 0;
+        self.status.overflow = (operand & 0b01000000) > 0;
 
-        self.status.zero = (operand & self.accumulator) > 0;
+        self.status.zero = (operand & self.accumulator) == 0;
     }
 
     pub fn nop(&mut self) {
