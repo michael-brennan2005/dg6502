@@ -1,11 +1,7 @@
-use std::str::FromStr;
-
-use ndarray::{Array2, stack};
-use strum_macros::EnumString;
-
+use ndarray::{Array2};
 use crate::bus;
 
-#[derive(EnumString, Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Instruction {
     /// add with carry
     ADC,
@@ -118,37 +114,26 @@ pub enum Instruction {
     /// transfer X to stack pointer
     TXS,
     /// transfer Y to accumulator
-    TYA
+    TYA,
+    Illegal
 }
 
-#[derive(EnumString, Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum AddressMode {
-    #[strum(serialize="A")]
     Accumulator,
-    #[strum(serialize="abs")]
     Absolute,
-    #[strum(serialize="abs,X")]
     AbsoluteXIndex,
-    #[strum(serialize="abs,Y")]
     AbsoluteYIndex,
-    #[strum(serialize="#")]
     Immediate,
-    #[strum(serialize="impl")]
     Implied,
-    #[strum(serialize="ind")]
     Indirect,
-    #[strum(serialize="X,ind")]
     IndirectXIndex,
-    #[strum(serialize="ind,Y")]
     IndirectYIndex,
-    #[strum(serialize="rel")]
     Relative,
-    #[strum(serialize="zpg")]
     Zeropage,
-    #[strum(serialize="zpg,X")]
     ZeropageXIndex,
-    #[strum(serialize="zpg,Y")]
-    ZeropageYIndex
+    ZeropageYIndex,
+    Illegal
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -211,28 +196,28 @@ pub struct Cpu<T: bus::Bus> {
     pub status: StatusRegister,
     pub stack_pointer: u8,
     pub bus: T,
-    pub lookup_table: Array2<&'static str>
+    pub lookup_table: Array2<(Instruction, AddressMode)>
 }
 
 impl<T: bus::Bus> Cpu<T> {
     pub fn new(bus: T) -> Self {
         let lookup_table = ndarray::arr2(&[
-            ["BRK impl","ORA X,ind", "---",   "---", "---", "ORA zpg", "ASL zpg", "---", "PHP impl", "ORA #", "ASL A", "---", "---", "ORA abs", "ASL abs", "---"],
-            ["BPL rel", "ORA ind,Y", "---",   "---", "---", "ORA zpg,X", "ASL zpg,X", "---", "CLC impl", "ORA abs,Y", "---", "---", "---", "ORA abs,X", "ASL abs,X", "---"],
-            ["JSR abs", "AND X,ind", "---",   "---", "BIT zpg", "AND zpg", "ROL zpg", "---", "PLP impl", "AND #", "ROL A", "---", "BIT abs", "AND abs", "ROL abs", "---"],
-            ["BMI rel", "AND ind,Y", "---",   "---", "---", "AND zpg,X", "ROL zpg,X", "---", "SEC impl", "AND abs,Y", "---", "---", "---", "AND abs,X", "ROL abs,X", "---"],
-            ["RTI impl","EOR X,ind", "---",   "---", "---", "EOR zpg", "LSR zpg", "---", "PHA impl", "EOR #", "LSR A", "---", "JMP abs", "EOR abs", "LSR abs", "---"],
-            ["BVC rel", "EOR ind,Y", "---",   "---", "---", "EOR zpg,X", "LSR zpg,X", "---", "CLI impl", "EOR abs,Y", "---", "---", "---", "EOR abs,X", "LSR abs,X", "---"],
-            ["RTS impl","ADC X,ind", "---",   "---", "---", "ADC zpg", "ROR zpg", "---", "PLA impl", "ADC #", "ROR A", "---", "JMP ind", "ADC abs", "ROR abs", "---"],
-            ["BVS rel", "ADC ind,Y", "---",   "---", "---", "ADC zpg,X", "ROR zpg,X", "---", "SEI impl", "ADC abs,Y", "---", "---", "---", "ADC abs,X", "ROR abs,X", "---"],
-            ["---",     "STA X,ind", "---",   "---", "STY zpg", "STA zpg", "STX zpg", "---", "DEY impl", "---", "TXA impl", "---", "STY abs", "STA abs", "STX abs", "---"],
-            ["BCC rel", "STA ind,Y", "---",   "---", "STY zpg,X", "STA zpg,X", "STX zpg,Y", "---", "TYA impl", "STA abs,Y", "TXS impl", "---", "---", "STA abs,X", "---", "---"],
-            ["LDY #",   "LDA X,ind", "LDX #", "---", "LDY zpg", "LDA zpg", "LDX zpg", "---", "TAY impl", "LDA #", "TAX impl", "---", "LDY abs", "LDA abs", "LDX abs", "---"],
-            ["BCS rel", "LDA ind,Y", "---",   "---", "LDY zpg,X", "LDA zpg,X", "LDX zpg,Y", "---", "CLV impl", "LDA abs,Y", "TSX impl", "---", "LDY abs,X", "LDA abs,X", "LDX abs,Y", "---"],
-            ["CPY #",   "CMP X,ind", "---",   "---", "CPY zpg", "CMP zpg", "DEC zpg", "---", "INY impl", "CMP #", "DEX impl", "---", "CPY abs", "CMP abs", "DEC abs", "---"],
-            ["BNE rel", "CMP ind,Y", "---",   "---", "---", "CMP zpg,X", "DEC zpg,X", "---", "CLD impl", "CMP abs,Y", "---", "---", "---", "CMP abs,X", "DEC abs,X", "---"],
-            ["CPX #",   "SBC X,ind", "---",   "---", "CPX zpg", "SBC zpg", "INC zpg", "---", "INX impl", "SBC #", "NOP impl", "---", "CPX abs", "SBC abs", "INC abs", "---"],
-            ["BEQ rel", "SBC ind,Y", "---",   "---", "---", "SBC zpg,X", "INC zpg,X", "---", "SED impl", "SBC abs,Y", "---", "---", "---", "SBC abs,X", "INC abs,X", "---"]
+            [(Instruction::BRK, AddressMode::Implied),(Instruction::ORA, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ORA, AddressMode::Zeropage), (Instruction::ASL, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::PHP, AddressMode::Implied), (Instruction::ORA, AddressMode::Immediate), (Instruction::ASL, AddressMode::Accumulator), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ORA, AddressMode::Absolute), (Instruction::ASL, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal)],
+            [(Instruction::BPL, AddressMode::Relative), (Instruction::ORA, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ORA, AddressMode::ZeropageXIndex), (Instruction::ASL, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CLC, AddressMode::Implied), (Instruction::ORA, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ORA, AddressMode::AbsoluteXIndex), (Instruction::ASL, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal)],
+            [(Instruction::JSR, AddressMode::Absolute), (Instruction::AND, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::BIT, AddressMode::Zeropage), (Instruction::AND, AddressMode::Zeropage), (Instruction::ROL, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::PLP, AddressMode::Implied), (Instruction::AND, AddressMode::Immediate), (Instruction::ROL, AddressMode::Accumulator), (Instruction::Illegal, AddressMode::Illegal), (Instruction::BIT, AddressMode::Absolute), (Instruction::AND, AddressMode::Absolute), (Instruction::ROL, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal)],
+            [(Instruction::BMI, AddressMode::Relative), (Instruction::AND, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::AND, AddressMode::ZeropageXIndex), (Instruction::ROL, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SEC, AddressMode::Implied), (Instruction::AND, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::AND, AddressMode::AbsoluteXIndex), (Instruction::ROL, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal)],
+            [(Instruction::RTI, AddressMode::Implied),(Instruction::EOR, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::EOR, AddressMode::Zeropage), (Instruction::LSR, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::PHA, AddressMode::Implied), (Instruction::EOR, AddressMode::Immediate), (Instruction::LSR, AddressMode::Accumulator), (Instruction::Illegal, AddressMode::Illegal), (Instruction::JMP, AddressMode::Absolute), (Instruction::EOR, AddressMode::Absolute), (Instruction::LSR, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal)],
+            [(Instruction::BVC, AddressMode::Relative), (Instruction::EOR, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::EOR, AddressMode::ZeropageXIndex), (Instruction::LSR, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CLI, AddressMode::Implied), (Instruction::EOR, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::EOR, AddressMode::AbsoluteXIndex), (Instruction::LSR, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal)],
+            [(Instruction::RTS, AddressMode::Implied),(Instruction::ADC, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ADC, AddressMode::Zeropage), (Instruction::ROR, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::PLA, AddressMode::Implied), (Instruction::ADC, AddressMode::Immediate), (Instruction::ROR, AddressMode::Accumulator), (Instruction::Illegal, AddressMode::Illegal), (Instruction::JMP, AddressMode::Indirect), (Instruction::ADC, AddressMode::Absolute), (Instruction::ROR, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal)],
+            [(Instruction::BVS, AddressMode::Relative), (Instruction::ADC, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ADC, AddressMode::ZeropageXIndex), (Instruction::ROR, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SEI, AddressMode::Implied), (Instruction::ADC, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ADC, AddressMode::AbsoluteXIndex), (Instruction::ROR, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal)],
+            [(Instruction::Illegal, AddressMode::Illegal),     (Instruction::STA, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::STY, AddressMode::Zeropage), (Instruction::STA, AddressMode::Zeropage), (Instruction::STX, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::DEY, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::TXA, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::STY, AddressMode::Absolute), (Instruction::STA, AddressMode::Absolute), (Instruction::STX, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal)],
+            [(Instruction::BCC, AddressMode::Relative), (Instruction::STA, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::STY, AddressMode::ZeropageXIndex), (Instruction::STA, AddressMode::ZeropageXIndex), (Instruction::STX, AddressMode::ZeropageYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::TYA, AddressMode::Implied), (Instruction::STA, AddressMode::AbsoluteYIndex), (Instruction::TXS, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::STA, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal)],
+            [(Instruction::LDY, AddressMode::Immediate),   (Instruction::LDA, AddressMode::IndirectXIndex), (Instruction::LDX, AddressMode::Immediate), (Instruction::Illegal, AddressMode::Illegal), (Instruction::LDY, AddressMode::Zeropage), (Instruction::LDA, AddressMode::Zeropage), (Instruction::LDX, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::TAY, AddressMode::Implied), (Instruction::LDA, AddressMode::Immediate), (Instruction::TAX, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::LDY, AddressMode::Absolute), (Instruction::LDA, AddressMode::Absolute), (Instruction::LDX, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal)],
+            [(Instruction::BCS, AddressMode::Relative), (Instruction::LDA, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::LDY, AddressMode::ZeropageXIndex), (Instruction::LDA, AddressMode::ZeropageXIndex), (Instruction::LDX, AddressMode::ZeropageYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CLV, AddressMode::Implied), (Instruction::LDA, AddressMode::AbsoluteYIndex), (Instruction::TSX, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::LDY, AddressMode::AbsoluteXIndex), (Instruction::LDA, AddressMode::AbsoluteXIndex), (Instruction::LDX, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal)],
+            [(Instruction::CPY, AddressMode::Immediate),   (Instruction::CMP, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::CPY, AddressMode::Zeropage), (Instruction::CMP, AddressMode::Zeropage), (Instruction::DEC, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::INY, AddressMode::Implied), (Instruction::CMP, AddressMode::Immediate), (Instruction::DEX, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CPY, AddressMode::Absolute), (Instruction::CMP, AddressMode::Absolute), (Instruction::DEC, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal)],
+            [(Instruction::BNE, AddressMode::Relative), (Instruction::CMP, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CMP, AddressMode::ZeropageXIndex), (Instruction::DEC, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CLD, AddressMode::Implied), (Instruction::CMP, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CMP, AddressMode::AbsoluteXIndex), (Instruction::DEC, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal)],
+            [(Instruction::CPX, AddressMode::Immediate),   (Instruction::SBC, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::CPX, AddressMode::Zeropage), (Instruction::SBC, AddressMode::Zeropage), (Instruction::INC, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::INX, AddressMode::Implied), (Instruction::SBC, AddressMode::Immediate), (Instruction::NOP, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CPX, AddressMode::Absolute), (Instruction::SBC, AddressMode::Absolute), (Instruction::INC, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal)],
+            [(Instruction::BEQ, AddressMode::Relative), (Instruction::SBC, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SBC, AddressMode::ZeropageXIndex), (Instruction::INC, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SED, AddressMode::Implied), (Instruction::SBC, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SBC, AddressMode::AbsoluteXIndex), (Instruction::INC, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal)]
         ]);
 
         Cpu {
@@ -353,6 +338,9 @@ impl<T: bus::Bus> Cpu<T> {
                 self.program_counter = self.program_counter.wrapping_add(1);
                 (self.bus.read(self.y.wrapping_add(low_byte) as u16), self.y.wrapping_add(low_byte) as u16)
             },
+            AddressMode::Illegal => {
+                panic!();
+            }
         }
 
     }
@@ -371,16 +359,10 @@ impl<T: bus::Bus> Cpu<T> {
         let high_nibble = (opcode & 0xF0) >> 4;
         let low_nibble = opcode & 0x0F;
 
-        let instruction = self.lookup_table.get([high_nibble as usize, low_nibble as usize]).unwrap().split(" ").collect::<Vec<&str>>();
+        let instruction = self.lookup_table.get([high_nibble as usize, low_nibble as usize]).unwrap();
 
-        let opcode = match Instruction::from_str(instruction[0]) {
-            Ok(a) => a,
-            Err(_) => {
-                println!("{} {}", instruction[0], instruction[1]);
-                panic!();
-            }
-        };
-        let address_mode = AddressMode::from_str(instruction[1]).unwrap();
+        let opcode = instruction.0;
+        let address_mode = instruction.1;
         let (operand, address) = self.fetch_operand(address_mode);
 
         match opcode {
@@ -452,6 +434,7 @@ impl<T: bus::Bus> Cpu<T> {
             Instruction::TXA => self.txa(),
             Instruction::TXS => self.txs(),
             Instruction::TYA => self.tya(),
+            Instruction::Illegal => panic!()
         }
         self.program_counter = self.program_counter.wrapping_add(1);
     }

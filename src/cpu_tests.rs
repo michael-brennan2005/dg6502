@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod cpu_tests {
-    use std::{fs::read_to_string, fmt::Display};
+    use std::{fs::read_to_string, fmt::Display, time::{Instant, Duration}};
     use serde::{Deserialize, Serialize};
 
     use crate::{cpu::{Cpu, StatusRegister}, bus::{BasicBus, Bus}};
@@ -98,6 +98,48 @@ mod cpu_tests {
         }
     }
 
+    fn run_and_time_test(test: OpcodeTest, panic: bool) -> (bool, Duration) {
+        let mut cpu: Cpu<BasicBus> = Cpu::new(BasicBus::default());
+        cpu.program_counter = test.initial.pc;
+        cpu.stack_pointer = test.initial.s;
+        cpu.accumulator = test.initial.a;
+        cpu.x = test.initial.x;
+        cpu.y = test.initial.y;
+        cpu.status = StatusRegister::from_u8(test.initial.p);
+
+        for (address, data) in &test.initial.ram {
+            cpu.bus.write(*address, *data)
+        }
+
+        let now = Instant::now();
+        cpu.step();
+        let elapsed = now.elapsed();
+        
+        let actual = CpuState {
+            pc: cpu.program_counter,
+            s: cpu.stack_pointer,
+            a: cpu.accumulator,
+            x: cpu.x,
+            y: cpu.y,
+            p: cpu.status.to_u8(),
+            ram: {
+                let mut vec: Vec<(u16, u8)> = vec![];
+                for (address, _) in &test.r#final.ram {
+                    vec.push((*address, cpu.bus.read(*address)));
+                }
+                vec
+            }
+        };
+
+        if actual != test.r#final {
+            if panic {
+                test_fail(test, actual);
+            }
+            (false, elapsed)
+        } else {
+            (true, elapsed)
+        }
+    }
     #[test]
     fn test_non_arithmetic_valid_opcodes() {
         for opcode in NOT_ARITHMETIC_VALID_OPCODES {
@@ -132,22 +174,26 @@ mod cpu_tests {
     fn grade_non_arithmetic_valid_opcodes() {
         let mut passed = 0;
         let mut failed = 0;
+        let mut duration = Duration::new(0, 0);
         for opcode in NOT_ARITHMETIC_VALID_OPCODES {
             let tests = read_to_string(format!("test_json/{}.json", opcode)).unwrap();
             let tests: Vec<OpcodeTest> = serde_json::from_str(&tests).unwrap();
 
             println!("Beginning tests for opcode {}...", opcode);
             for test in tests {
-                if run_test(test, false) {
+                let (success, time_taken) = run_and_time_test(test, false);
+                if success {
                     passed += 1;
                 } else {
                     failed += 1;
                 };
+                duration += time_taken;
             }
             println!("Tests for opcode {} have finished.", opcode);
             
         }
         println!("Total: {}, Passed: {}, Failed: {}, Grade: {}%", passed + failed, passed, failed, (passed as f32 / (passed as f32 + failed as f32)) * 100.0);
+        println!("Total Time: {:?}, Time/Step: {:?}", duration, duration / (passed + failed));
     }
 
     #[test]
