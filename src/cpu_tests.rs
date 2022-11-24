@@ -58,7 +58,7 @@ mod cpu_tests {
         panic!();
     }
 
-    fn run_test(test: OpcodeTest, panic: bool) -> bool {
+    fn run_test(test: OpcodeTest, panic: bool) -> (bool, u8) {
         let mut cpu: Cpu<BasicBus> = Cpu::new(BasicBus::default());
         cpu.program_counter = test.initial.pc;
         cpu.stack_pointer = test.initial.s;
@@ -71,7 +71,7 @@ mod cpu_tests {
             cpu.bus.write(*address, *data)
         }
 
-        cpu.step();
+        let cycles = cpu.step();
         let actual = CpuState {
             pc: cpu.program_counter,
             s: cpu.stack_pointer,
@@ -92,13 +92,13 @@ mod cpu_tests {
             if panic {
                 test_fail(test, actual);
             }
-            false
+            (false, cycles)
         } else {
-            true
+            (true, cycles)
         }
     }
 
-    fn run_and_time_test(test: OpcodeTest, panic: bool) -> (bool, Duration) {
+    fn run_and_time_test(test: OpcodeTest, panic: bool) -> (bool, Duration, u8) {
         let mut cpu: Cpu<BasicBus> = Cpu::new(BasicBus::default());
         cpu.program_counter = test.initial.pc;
         cpu.stack_pointer = test.initial.s;
@@ -112,7 +112,7 @@ mod cpu_tests {
         }
 
         let now = Instant::now();
-        cpu.step();
+        let cycles = cpu.step();
         let elapsed = now.elapsed();
         
         let actual = CpuState {
@@ -135,9 +135,9 @@ mod cpu_tests {
             if panic {
                 test_fail(test, actual);
             }
-            (false, elapsed)
+            (false, elapsed, cycles)
         } else {
-            (true, elapsed)
+            (true, elapsed, cycles)
         }
     }
 
@@ -176,25 +176,28 @@ mod cpu_tests {
         let mut passed = 0;
         let mut failed = 0;
         let mut duration = Duration::new(0, 0);
+        let mut cycles: usize = 0;
         for opcode in NOT_ARITHMETIC_VALID_OPCODES {
             let tests = read_to_string(format!("test_json/{}.json", opcode.to_lowercase())).unwrap();
             let tests: Vec<OpcodeTest> = serde_json::from_str(&tests).unwrap();
 
             println!("Beginning tests for opcode {}...", opcode);
             for test in tests {
-                let (success, time_taken) = run_and_time_test(test, false);
+                let (success, time_taken, cycles_taken) = run_and_time_test(test, false);
                 if success {
                     passed += 1;
                 } else {
                     failed += 1;
                 };
                 duration += time_taken;
+                cycles += cycles_taken as usize;
             }
             println!("Tests for opcode {} have finished.", opcode);
             
         }
         println!("Total: {}, Passed: {}, Failed: {}, Grade: {}%", passed + failed, passed, failed, (passed as f32 / (passed as f32 + failed as f32)) * 100.0);
         println!("Total Time: {:?}, Time/Step: {:?}", duration, duration / (passed + failed));
+        println!("Total Cycles: {:?}, Lower Bound Max Clock Rate: {:?} Hz", cycles, cycles as f64 / duration.as_secs_f64());
     }
 
     #[test]
@@ -207,7 +210,8 @@ mod cpu_tests {
 
             println!("Beginning tests for opcode {}...", opcode);
             for test in tests {
-                if run_test(test, false) {
+                let (success, _) = run_test(test, false);
+                if success {
                     passed += 1;
                 } else {
                     failed += 1;

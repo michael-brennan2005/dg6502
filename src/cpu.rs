@@ -1,5 +1,50 @@
-use ndarray::{Array2};
 use crate::bus;
+
+
+const LOOKUP_TABLE: [(Instruction, AddressMode); 256] = [
+    (Instruction::BRK, AddressMode::Implied),(Instruction::ORA, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ORA, AddressMode::Zeropage), (Instruction::ASL, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::PHP, AddressMode::Implied), (Instruction::ORA, AddressMode::Immediate), (Instruction::ASL, AddressMode::Accumulator), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ORA, AddressMode::Absolute), (Instruction::ASL, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
+    (Instruction::BPL, AddressMode::Relative), (Instruction::ORA, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ORA, AddressMode::ZeropageXIndex), (Instruction::ASL, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CLC, AddressMode::Implied), (Instruction::ORA, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ORA, AddressMode::AbsoluteXIndex), (Instruction::ASL, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal),
+    (Instruction::JSR, AddressMode::Absolute), (Instruction::AND, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::BIT, AddressMode::Zeropage), (Instruction::AND, AddressMode::Zeropage), (Instruction::ROL, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::PLP, AddressMode::Implied), (Instruction::AND, AddressMode::Immediate), (Instruction::ROL, AddressMode::Accumulator), (Instruction::Illegal, AddressMode::Illegal), (Instruction::BIT, AddressMode::Absolute), (Instruction::AND, AddressMode::Absolute), (Instruction::ROL, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
+    (Instruction::BMI, AddressMode::Relative), (Instruction::AND, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::AND, AddressMode::ZeropageXIndex), (Instruction::ROL, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SEC, AddressMode::Implied), (Instruction::AND, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::AND, AddressMode::AbsoluteXIndex), (Instruction::ROL, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal),
+    (Instruction::RTI, AddressMode::Implied),(Instruction::EOR, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::EOR, AddressMode::Zeropage), (Instruction::LSR, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::PHA, AddressMode::Implied), (Instruction::EOR, AddressMode::Immediate), (Instruction::LSR, AddressMode::Accumulator), (Instruction::Illegal, AddressMode::Illegal), (Instruction::JMP, AddressMode::Absolute), (Instruction::EOR, AddressMode::Absolute), (Instruction::LSR, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
+    (Instruction::BVC, AddressMode::Relative), (Instruction::EOR, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::EOR, AddressMode::ZeropageXIndex), (Instruction::LSR, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CLI, AddressMode::Implied), (Instruction::EOR, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::EOR, AddressMode::AbsoluteXIndex), (Instruction::LSR, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal),
+    (Instruction::RTS, AddressMode::Implied),(Instruction::ADC, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ADC, AddressMode::Zeropage), (Instruction::ROR, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::PLA, AddressMode::Implied), (Instruction::ADC, AddressMode::Immediate), (Instruction::ROR, AddressMode::Accumulator), (Instruction::Illegal, AddressMode::Illegal), (Instruction::JMP, AddressMode::Indirect), (Instruction::ADC, AddressMode::Absolute), (Instruction::ROR, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
+    (Instruction::BVS, AddressMode::Relative), (Instruction::ADC, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ADC, AddressMode::ZeropageXIndex), (Instruction::ROR, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SEI, AddressMode::Implied), (Instruction::ADC, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ADC, AddressMode::AbsoluteXIndex), (Instruction::ROR, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal),
+    (Instruction::Illegal, AddressMode::Illegal),     (Instruction::STA, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::STY, AddressMode::Zeropage), (Instruction::STA, AddressMode::Zeropage), (Instruction::STX, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::DEY, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::TXA, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::STY, AddressMode::Absolute), (Instruction::STA, AddressMode::Absolute), (Instruction::STX, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
+    (Instruction::BCC, AddressMode::Relative), (Instruction::STA, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::STY, AddressMode::ZeropageXIndex), (Instruction::STA, AddressMode::ZeropageXIndex), (Instruction::STX, AddressMode::ZeropageYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::TYA, AddressMode::Implied), (Instruction::STA, AddressMode::AbsoluteYIndex), (Instruction::TXS, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::STA, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal),
+    (Instruction::LDY, AddressMode::Immediate),   (Instruction::LDA, AddressMode::IndirectXIndex), (Instruction::LDX, AddressMode::Immediate), (Instruction::Illegal, AddressMode::Illegal), (Instruction::LDY, AddressMode::Zeropage), (Instruction::LDA, AddressMode::Zeropage), (Instruction::LDX, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::TAY, AddressMode::Implied), (Instruction::LDA, AddressMode::Immediate), (Instruction::TAX, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::LDY, AddressMode::Absolute), (Instruction::LDA, AddressMode::Absolute), (Instruction::LDX, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
+    (Instruction::BCS, AddressMode::Relative), (Instruction::LDA, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::LDY, AddressMode::ZeropageXIndex), (Instruction::LDA, AddressMode::ZeropageXIndex), (Instruction::LDX, AddressMode::ZeropageYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CLV, AddressMode::Implied), (Instruction::LDA, AddressMode::AbsoluteYIndex), (Instruction::TSX, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::LDY, AddressMode::AbsoluteXIndex), (Instruction::LDA, AddressMode::AbsoluteXIndex), (Instruction::LDX, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal),
+    (Instruction::CPY, AddressMode::Immediate),   (Instruction::CMP, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::CPY, AddressMode::Zeropage), (Instruction::CMP, AddressMode::Zeropage), (Instruction::DEC, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::INY, AddressMode::Implied), (Instruction::CMP, AddressMode::Immediate), (Instruction::DEX, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CPY, AddressMode::Absolute), (Instruction::CMP, AddressMode::Absolute), (Instruction::DEC, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
+    (Instruction::BNE, AddressMode::Relative), (Instruction::CMP, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CMP, AddressMode::ZeropageXIndex), (Instruction::DEC, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CLD, AddressMode::Implied), (Instruction::CMP, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CMP, AddressMode::AbsoluteXIndex), (Instruction::DEC, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal),
+    (Instruction::CPX, AddressMode::Immediate),   (Instruction::SBC, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::CPX, AddressMode::Zeropage), (Instruction::SBC, AddressMode::Zeropage), (Instruction::INC, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::INX, AddressMode::Implied), (Instruction::SBC, AddressMode::Immediate), (Instruction::NOP, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CPX, AddressMode::Absolute), (Instruction::SBC, AddressMode::Absolute), (Instruction::INC, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
+    (Instruction::BEQ, AddressMode::Relative), (Instruction::SBC, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SBC, AddressMode::ZeropageXIndex), (Instruction::INC, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SED, AddressMode::Implied), (Instruction::SBC, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SBC, AddressMode::AbsoluteXIndex), (Instruction::INC, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal)
+];
+
+const CYCLE_TIMES: [(u8, CycleAddition); 256] = [
+    (7, CycleAddition::None), (6, CycleAddition::None), (0, CycleAddition::None), (8, CycleAddition::None), (3, CycleAddition::None), (3, CycleAddition::None), (5, CycleAddition::None), (5, CycleAddition::None), (3, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (6, CycleAddition::None), (6, CycleAddition::None), 
+    (2, CycleAddition::BranchOnPage), (5, CycleAddition::PageBoundaryCrossed), (0, CycleAddition::None), (8, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (6, CycleAddition::None), (6, CycleAddition::None), (2, CycleAddition::None), (4, CycleAddition::PageBoundaryCrossed), (2, CycleAddition::None), (7, CycleAddition::None), (4, CycleAddition::PageBoundaryCrossed), (4, CycleAddition::PageBoundaryCrossed), (7, CycleAddition::None), (7, CycleAddition::None), 
+    (6, CycleAddition::None), (6, CycleAddition::None), (0, CycleAddition::None), (8, CycleAddition::None), (3, CycleAddition::None), (3, CycleAddition::None), (5, CycleAddition::None), (5, CycleAddition::None), (4, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (6, CycleAddition::None), (6, CycleAddition::None), 
+    (2, CycleAddition::BranchOnPage), (5, CycleAddition::PageBoundaryCrossed), (0, CycleAddition::None), (8, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (6, CycleAddition::None), (6, CycleAddition::None), (2, CycleAddition::None), (4, CycleAddition::PageBoundaryCrossed), (2, CycleAddition::None), (7, CycleAddition::None), (4, CycleAddition::PageBoundaryCrossed), (4, CycleAddition::PageBoundaryCrossed), (7, CycleAddition::None), (7, CycleAddition::None), 
+    (6, CycleAddition::None), (6, CycleAddition::None), (0, CycleAddition::None), (8, CycleAddition::None), (3, CycleAddition::None), (3, CycleAddition::None), (5, CycleAddition::None), (5, CycleAddition::None), (3, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (3, CycleAddition::None), (4, CycleAddition::None), (6, CycleAddition::None), (6, CycleAddition::None), 
+    (2, CycleAddition::BranchOnPage), (5, CycleAddition::PageBoundaryCrossed), (0, CycleAddition::None), (8, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (6, CycleAddition::None), (6, CycleAddition::None), (2, CycleAddition::None), (4, CycleAddition::PageBoundaryCrossed), (2, CycleAddition::None), (7, CycleAddition::None), (4, CycleAddition::PageBoundaryCrossed), (4, CycleAddition::PageBoundaryCrossed), (7, CycleAddition::None), (7, CycleAddition::None), 
+    (6, CycleAddition::None), (6, CycleAddition::None), (0, CycleAddition::None), (8, CycleAddition::None), (3, CycleAddition::None), (3, CycleAddition::None), (5, CycleAddition::None), (5, CycleAddition::None), (4, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (5, CycleAddition::None), (4, CycleAddition::None), (6, CycleAddition::None), (6, CycleAddition::None), 
+    (2, CycleAddition::BranchOnPage), (5, CycleAddition::PageBoundaryCrossed), (0, CycleAddition::None), (8, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (6, CycleAddition::None), (6, CycleAddition::None), (2, CycleAddition::None), (4, CycleAddition::PageBoundaryCrossed), (2, CycleAddition::None), (7, CycleAddition::None), (4, CycleAddition::PageBoundaryCrossed), (4, CycleAddition::PageBoundaryCrossed), (7, CycleAddition::None), (7, CycleAddition::None), 
+    (2, CycleAddition::None), (6, CycleAddition::None), (2, CycleAddition::None), (6, CycleAddition::None), (3, CycleAddition::None), (3, CycleAddition::None), (3, CycleAddition::None), (3, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), 
+    (2, CycleAddition::BranchOnPage), (6, CycleAddition::None), (0, CycleAddition::None), (6, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (2, CycleAddition::None), (5, CycleAddition::None), (2, CycleAddition::None), (5, CycleAddition::None), (5, CycleAddition::None), (5, CycleAddition::None), (5, CycleAddition::None), (5, CycleAddition::None), 
+    (2, CycleAddition::None), (6, CycleAddition::None), (2, CycleAddition::None), (6, CycleAddition::None), (3, CycleAddition::None), (3, CycleAddition::None), (3, CycleAddition::None), (3, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), 
+    (2, CycleAddition::BranchOnPage), (5, CycleAddition::PageBoundaryCrossed), (0, CycleAddition::None), (5, CycleAddition::PageBoundaryCrossed), (4, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (2, CycleAddition::None), (4, CycleAddition::PageBoundaryCrossed), (2, CycleAddition::None), (4, CycleAddition::PageBoundaryCrossed), (4, CycleAddition::PageBoundaryCrossed), (4, CycleAddition::PageBoundaryCrossed), (4, CycleAddition::PageBoundaryCrossed), (4, CycleAddition::PageBoundaryCrossed), 
+    (2, CycleAddition::None), (6, CycleAddition::None), (2, CycleAddition::None), (8, CycleAddition::None), (3, CycleAddition::None), (3, CycleAddition::None), (5, CycleAddition::None), (5, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (6, CycleAddition::None), (6, CycleAddition::None), 
+    (2, CycleAddition::BranchOnPage), (5, CycleAddition::PageBoundaryCrossed), (0, CycleAddition::None), (8, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (6, CycleAddition::None), (6, CycleAddition::None), (2, CycleAddition::None), (4, CycleAddition::PageBoundaryCrossed), (2, CycleAddition::None), (7, CycleAddition::None), (4, CycleAddition::PageBoundaryCrossed), (4, CycleAddition::PageBoundaryCrossed), (7, CycleAddition::None), (7, CycleAddition::None), 
+    (2, CycleAddition::None), (6, CycleAddition::None), (2, CycleAddition::None), (8, CycleAddition::None), (3, CycleAddition::None), (3, CycleAddition::None), (5, CycleAddition::None), (5, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (2, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (6, CycleAddition::None), (6, CycleAddition::None), 
+    (2, CycleAddition::BranchOnPage), (5, CycleAddition::PageBoundaryCrossed), (0, CycleAddition::None), (8, CycleAddition::None), (4, CycleAddition::None), (4, CycleAddition::None), (6, CycleAddition::None), (6, CycleAddition::None), (2, CycleAddition::None), (4, CycleAddition::PageBoundaryCrossed), (2, CycleAddition::None), (7, CycleAddition::None), (4, CycleAddition::PageBoundaryCrossed), (4, CycleAddition::PageBoundaryCrossed), (7, CycleAddition::None), (7, CycleAddition::None)
+];
+
+#[derive(Debug, Clone, Copy)]
+enum CycleAddition {
+    None,
+    PageBoundaryCrossed,
+    BranchOnPage
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum Instruction {
@@ -189,6 +234,7 @@ mod status_register_test {
     }
 }
 pub struct Cpu<T: bus::Bus> {
+    pub previous_program_counter: u16,
     pub program_counter: u16,
     pub accumulator: u8,
     pub x: u8,
@@ -198,28 +244,10 @@ pub struct Cpu<T: bus::Bus> {
     pub bus: T
 }
 
-const LOOKUP_TABLE: [(Instruction, AddressMode); 256] = [
-    (Instruction::BRK, AddressMode::Implied),(Instruction::ORA, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ORA, AddressMode::Zeropage), (Instruction::ASL, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::PHP, AddressMode::Implied), (Instruction::ORA, AddressMode::Immediate), (Instruction::ASL, AddressMode::Accumulator), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ORA, AddressMode::Absolute), (Instruction::ASL, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::BPL, AddressMode::Relative), (Instruction::ORA, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ORA, AddressMode::ZeropageXIndex), (Instruction::ASL, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CLC, AddressMode::Implied), (Instruction::ORA, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ORA, AddressMode::AbsoluteXIndex), (Instruction::ASL, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::JSR, AddressMode::Absolute), (Instruction::AND, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::BIT, AddressMode::Zeropage), (Instruction::AND, AddressMode::Zeropage), (Instruction::ROL, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::PLP, AddressMode::Implied), (Instruction::AND, AddressMode::Immediate), (Instruction::ROL, AddressMode::Accumulator), (Instruction::Illegal, AddressMode::Illegal), (Instruction::BIT, AddressMode::Absolute), (Instruction::AND, AddressMode::Absolute), (Instruction::ROL, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::BMI, AddressMode::Relative), (Instruction::AND, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::AND, AddressMode::ZeropageXIndex), (Instruction::ROL, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SEC, AddressMode::Implied), (Instruction::AND, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::AND, AddressMode::AbsoluteXIndex), (Instruction::ROL, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::RTI, AddressMode::Implied),(Instruction::EOR, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::EOR, AddressMode::Zeropage), (Instruction::LSR, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::PHA, AddressMode::Implied), (Instruction::EOR, AddressMode::Immediate), (Instruction::LSR, AddressMode::Accumulator), (Instruction::Illegal, AddressMode::Illegal), (Instruction::JMP, AddressMode::Absolute), (Instruction::EOR, AddressMode::Absolute), (Instruction::LSR, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::BVC, AddressMode::Relative), (Instruction::EOR, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::EOR, AddressMode::ZeropageXIndex), (Instruction::LSR, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CLI, AddressMode::Implied), (Instruction::EOR, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::EOR, AddressMode::AbsoluteXIndex), (Instruction::LSR, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::RTS, AddressMode::Implied),(Instruction::ADC, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ADC, AddressMode::Zeropage), (Instruction::ROR, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::PLA, AddressMode::Implied), (Instruction::ADC, AddressMode::Immediate), (Instruction::ROR, AddressMode::Accumulator), (Instruction::Illegal, AddressMode::Illegal), (Instruction::JMP, AddressMode::Indirect), (Instruction::ADC, AddressMode::Absolute), (Instruction::ROR, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::BVS, AddressMode::Relative), (Instruction::ADC, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ADC, AddressMode::ZeropageXIndex), (Instruction::ROR, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SEI, AddressMode::Implied), (Instruction::ADC, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ADC, AddressMode::AbsoluteXIndex), (Instruction::ROR, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::Illegal, AddressMode::Illegal),     (Instruction::STA, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::STY, AddressMode::Zeropage), (Instruction::STA, AddressMode::Zeropage), (Instruction::STX, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::DEY, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::TXA, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::STY, AddressMode::Absolute), (Instruction::STA, AddressMode::Absolute), (Instruction::STX, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::BCC, AddressMode::Relative), (Instruction::STA, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::STY, AddressMode::ZeropageXIndex), (Instruction::STA, AddressMode::ZeropageXIndex), (Instruction::STX, AddressMode::ZeropageYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::TYA, AddressMode::Implied), (Instruction::STA, AddressMode::AbsoluteYIndex), (Instruction::TXS, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::STA, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::LDY, AddressMode::Immediate),   (Instruction::LDA, AddressMode::IndirectXIndex), (Instruction::LDX, AddressMode::Immediate), (Instruction::Illegal, AddressMode::Illegal), (Instruction::LDY, AddressMode::Zeropage), (Instruction::LDA, AddressMode::Zeropage), (Instruction::LDX, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::TAY, AddressMode::Implied), (Instruction::LDA, AddressMode::Immediate), (Instruction::TAX, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::LDY, AddressMode::Absolute), (Instruction::LDA, AddressMode::Absolute), (Instruction::LDX, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::BCS, AddressMode::Relative), (Instruction::LDA, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::LDY, AddressMode::ZeropageXIndex), (Instruction::LDA, AddressMode::ZeropageXIndex), (Instruction::LDX, AddressMode::ZeropageYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CLV, AddressMode::Implied), (Instruction::LDA, AddressMode::AbsoluteYIndex), (Instruction::TSX, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::LDY, AddressMode::AbsoluteXIndex), (Instruction::LDA, AddressMode::AbsoluteXIndex), (Instruction::LDX, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::CPY, AddressMode::Immediate),   (Instruction::CMP, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::CPY, AddressMode::Zeropage), (Instruction::CMP, AddressMode::Zeropage), (Instruction::DEC, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::INY, AddressMode::Implied), (Instruction::CMP, AddressMode::Immediate), (Instruction::DEX, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CPY, AddressMode::Absolute), (Instruction::CMP, AddressMode::Absolute), (Instruction::DEC, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::BNE, AddressMode::Relative), (Instruction::CMP, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CMP, AddressMode::ZeropageXIndex), (Instruction::DEC, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CLD, AddressMode::Implied), (Instruction::CMP, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CMP, AddressMode::AbsoluteXIndex), (Instruction::DEC, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::CPX, AddressMode::Immediate),   (Instruction::SBC, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::CPX, AddressMode::Zeropage), (Instruction::SBC, AddressMode::Zeropage), (Instruction::INC, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::INX, AddressMode::Implied), (Instruction::SBC, AddressMode::Immediate), (Instruction::NOP, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CPX, AddressMode::Absolute), (Instruction::SBC, AddressMode::Absolute), (Instruction::INC, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::BEQ, AddressMode::Relative), (Instruction::SBC, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SBC, AddressMode::ZeropageXIndex), (Instruction::INC, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SED, AddressMode::Implied), (Instruction::SBC, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SBC, AddressMode::AbsoluteXIndex), (Instruction::INC, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal)
-];
-
 impl<T: bus::Bus> Cpu<T> {
     pub fn new(bus: T) -> Self {
         Cpu {
+            previous_program_counter: 0x0,
             program_counter: 0x400,
             accumulator: 0,
             x: 0,
@@ -242,39 +270,43 @@ impl<T: bus::Bus> Cpu<T> {
         self.status.negative = (operand as i8) < 0;
     }
 
-    pub fn fetch_operand(&mut self, address_mode: AddressMode) -> (u8, u16) {
+    /// (Operand, Address, PageBoundaryCrossed)
+    /// PageBoundaryCrossed will only possibly be true in AbsoluteXIndex, AbsoluteYIndex, and IndirectYIndex
+    pub fn fetch_operand(&mut self, address_mode: AddressMode) -> (u8, u16, bool) {
         match address_mode {
             AddressMode::Accumulator => {
-                (self.accumulator, 0)
+                (self.accumulator, 0, false)
             },
             AddressMode::Absolute => {
                 let low_byte = self.bus.read(self.program_counter.wrapping_add(1));
                 let high_byte = self.bus.read(self.program_counter.wrapping_add(2));
                 self.program_counter = self.program_counter.wrapping_add(2);
                 let address = ((high_byte as u16) << 8) | low_byte as u16;
-                (self.bus.read(address), address)
+                (self.bus.read(address), address, false)
             },
             AddressMode::AbsoluteXIndex => {
                 let low_byte = self.bus.read(self.program_counter.wrapping_add(1));
                 let high_byte = self.bus.read(self.program_counter.wrapping_add(2));
                 self.program_counter = self.program_counter.wrapping_add(2);
-                let address = (((high_byte as u16) << 8) | low_byte as u16).wrapping_add(self.x as u16);
-                (self.bus.read(address), address)
+                let address = ((high_byte as u16) << 8) | low_byte as u16;
+                let address_indexed = address.wrapping_add(self.x as u16);
+                (self.bus.read(address_indexed), address_indexed, address_indexed & 0xFF00 != address & 0xFF00)
             },
             AddressMode::AbsoluteYIndex => {
                 let low_byte = self.bus.read(self.program_counter.wrapping_add(1));
                 let high_byte = self.bus.read(self.program_counter.wrapping_add(2));
-                self.program_counter += 2;
-                let address = (((high_byte as u16) << 8) | low_byte as u16).wrapping_add(self.y as u16);
-                (self.bus.read(address), address)
+                self.program_counter = self.program_counter.wrapping_add(2);
+                let address = ((high_byte as u16) << 8) | low_byte as u16;
+                let address_indexed = address.wrapping_add(self.y as u16);
+                (self.bus.read(address_indexed), address_indexed, address_indexed & 0xFF00 != address & 0xFF00)
             },
             AddressMode::Immediate => {
                 let byte = self.bus.read(self.program_counter.wrapping_add(1));
                 self.program_counter = self.program_counter.wrapping_add(1);
-                (byte, self.program_counter)
+                (byte, self.program_counter, false)
             },
             AddressMode::Implied => {
-                (0, 0)
+                (0, 0, false)
             },
             AddressMode::Indirect => {
                 let low_byte = self.bus.read(self.program_counter + 1);
@@ -286,12 +318,12 @@ impl<T: bus::Bus> Cpu<T> {
                     let low_byte = self.bus.read(address);
                     let high_byte = self.bus.read(address & 0xFF00);
                     let indirect = (u16::from(high_byte) << 8) | u16::from(low_byte);
-                    (0,indirect)
+                    (0,indirect, false)
                 } else {
                     let low_byte = self.bus.read(address);
                     let high_byte = self.bus.read(address.wrapping_add(1));
                     let indirect = (u16::from(high_byte) << 8) | u16::from(low_byte);
-                    (0,indirect)
+                    (0,indirect, false)
                 }
                 
             },
@@ -302,7 +334,7 @@ impl<T: bus::Bus> Cpu<T> {
                 let high_byte = self.bus.read(byte.wrapping_add(self.x).wrapping_add(1) as u16);
                 let address = ((high_byte as u16) << 8) | low_byte as u16;
 
-                (self.bus.read(address), address)
+                (self.bus.read(address), address, false)
             },
             AddressMode::IndirectYIndex => {
                 // fetch  address at zero page
@@ -310,8 +342,9 @@ impl<T: bus::Bus> Cpu<T> {
                 self.program_counter = self.program_counter.wrapping_add(1);
                 let low_byte = self.bus.read((zeropage_byte) as u16);
                 let high_byte = self.bus.read((zeropage_byte.wrapping_add(1)) as u16);
-                let address = (((high_byte as u16) << 8) | low_byte as u16).wrapping_add(self.y as u16);
-                (self.bus.read(address), address)
+                let address = ((high_byte as u16) << 8) | low_byte as u16;
+                let address_indexed = address.wrapping_add(self.y as u16);
+                (self.bus.read(address_indexed), address_indexed, address_indexed & 0xFF00 != address & 0xFF00)
             },
             AddressMode::Relative => {
                 // this will be broken
@@ -319,22 +352,22 @@ impl<T: bus::Bus> Cpu<T> {
                 let byte = byte as i8;
                 self.program_counter = self.program_counter.wrapping_add(1);
                 let address = (self.program_counter as i16).wrapping_add(byte as i16);
-                (0,address as u16)
+                (0,address as u16, false)
             },
             AddressMode::Zeropage => {
                 let low_byte = self.bus.read(self.program_counter.wrapping_add(1));
                 self.program_counter = self.program_counter.wrapping_add(1);
-                (self.bus.read(low_byte as u16), low_byte as u16)
+                (self.bus.read(low_byte as u16), low_byte as u16, false)
             },
             AddressMode::ZeropageXIndex => {
                 let low_byte = self.bus.read(self.program_counter.wrapping_add(1));
                 self.program_counter = self.program_counter.wrapping_add(1);
-                (self.bus.read(self.x.wrapping_add(low_byte) as u16), self.x.wrapping_add(low_byte) as u16)
+                (self.bus.read(self.x.wrapping_add(low_byte) as u16), self.x.wrapping_add(low_byte) as u16, false)
             },
             AddressMode::ZeropageYIndex => {
                 let low_byte = self.bus.read(self.program_counter + 1);
                 self.program_counter = self.program_counter.wrapping_add(1);
-                (self.bus.read(self.y.wrapping_add(low_byte) as u16), self.y.wrapping_add(low_byte) as u16)
+                (self.bus.read(self.y.wrapping_add(low_byte) as u16), self.y.wrapping_add(low_byte) as u16, false)
             },
             AddressMode::Illegal => {
                 panic!();
@@ -351,17 +384,14 @@ impl<T: bus::Bus> Cpu<T> {
         self.program_counter = new_address;
     }
 
-    pub fn step(&mut self) {
+    pub fn step(&mut self) -> u8 {
         let opcode = self.bus.read(self.program_counter);
 
         let high_nibble = (opcode & 0xF0) >> 4;
         let low_nibble = opcode & 0x0F;
 
-        let instruction = LOOKUP_TABLE[(high_nibble * 16 + low_nibble) as usize];
-
-        let opcode = instruction.0;
-        let address_mode = instruction.1;
-        let (operand, address) = self.fetch_operand(address_mode);
+        let (opcode, address_mode) = LOOKUP_TABLE[(high_nibble * 16 + low_nibble) as usize];
+        let (operand, address, page_boundary_crossed) = self.fetch_operand(address_mode);
 
         match opcode {
             Instruction::ADC => self.adc(operand),
@@ -434,7 +464,29 @@ impl<T: bus::Bus> Cpu<T> {
             Instruction::TYA => self.tya(),
             Instruction::Illegal => panic!()
         }
+
+        self.previous_program_counter = self.program_counter;
         self.program_counter = self.program_counter.wrapping_add(1);
+
+        let (cycles, addition) = CYCLE_TIMES[(high_nibble * 16 + low_nibble) as usize];
+        match addition {
+            CycleAddition::None => cycles,
+            CycleAddition::PageBoundaryCrossed => {
+                if page_boundary_crossed {
+                    cycles + 1
+                } else {
+                    cycles
+                }
+            },
+            CycleAddition::BranchOnPage => {
+                if self.previous_program_counter & 0xFF00 == self.program_counter & 0xFF00 {
+                    cycles + 1
+                } else {
+                    cycles + 2
+                }
+            },
+        }
+
     }
 
     pub fn push_to_stack(&mut self, x: u8) {
