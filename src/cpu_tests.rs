@@ -140,10 +140,11 @@ mod cpu_tests {
             (true, elapsed)
         }
     }
+
     #[test]
     fn test_non_arithmetic_valid_opcodes() {
         for opcode in NOT_ARITHMETIC_VALID_OPCODES {
-            let tests = read_to_string(format!("test_json/{}.json", opcode)).unwrap();
+            let tests = read_to_string(format!("test_json/{}.json", opcode.to_lowercase())).unwrap();
             let tests: Vec<OpcodeTest> = serde_json::from_str(&tests).unwrap();
 
             println!("Beginning tests for opcode {}...", opcode);
@@ -176,7 +177,7 @@ mod cpu_tests {
         let mut failed = 0;
         let mut duration = Duration::new(0, 0);
         for opcode in NOT_ARITHMETIC_VALID_OPCODES {
-            let tests = read_to_string(format!("test_json/{}.json", opcode)).unwrap();
+            let tests = read_to_string(format!("test_json/{}.json", opcode.to_lowercase())).unwrap();
             let tests: Vec<OpcodeTest> = serde_json::from_str(&tests).unwrap();
 
             println!("Beginning tests for opcode {}...", opcode);
