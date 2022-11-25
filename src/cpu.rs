@@ -2,22 +2,22 @@ use crate::bus;
 
 
 const LOOKUP_TABLE: [(Instruction, AddressMode); 256] = [
-    (Instruction::BRK, AddressMode::Implied),(Instruction::ORA, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ORA, AddressMode::Zeropage), (Instruction::ASL, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::PHP, AddressMode::Implied), (Instruction::ORA, AddressMode::Immediate), (Instruction::ASL, AddressMode::Accumulator), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ORA, AddressMode::Absolute), (Instruction::ASL, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::BPL, AddressMode::Relative), (Instruction::ORA, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ORA, AddressMode::ZeropageXIndex), (Instruction::ASL, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CLC, AddressMode::Implied), (Instruction::ORA, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ORA, AddressMode::AbsoluteXIndex), (Instruction::ASL, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::JSR, AddressMode::Absolute), (Instruction::AND, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::BIT, AddressMode::Zeropage), (Instruction::AND, AddressMode::Zeropage), (Instruction::ROL, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::PLP, AddressMode::Implied), (Instruction::AND, AddressMode::Immediate), (Instruction::ROL, AddressMode::Accumulator), (Instruction::Illegal, AddressMode::Illegal), (Instruction::BIT, AddressMode::Absolute), (Instruction::AND, AddressMode::Absolute), (Instruction::ROL, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::BMI, AddressMode::Relative), (Instruction::AND, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::AND, AddressMode::ZeropageXIndex), (Instruction::ROL, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SEC, AddressMode::Implied), (Instruction::AND, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::AND, AddressMode::AbsoluteXIndex), (Instruction::ROL, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::RTI, AddressMode::Implied),(Instruction::EOR, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::EOR, AddressMode::Zeropage), (Instruction::LSR, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::PHA, AddressMode::Implied), (Instruction::EOR, AddressMode::Immediate), (Instruction::LSR, AddressMode::Accumulator), (Instruction::Illegal, AddressMode::Illegal), (Instruction::JMP, AddressMode::Absolute), (Instruction::EOR, AddressMode::Absolute), (Instruction::LSR, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::BVC, AddressMode::Relative), (Instruction::EOR, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::EOR, AddressMode::ZeropageXIndex), (Instruction::LSR, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CLI, AddressMode::Implied), (Instruction::EOR, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::EOR, AddressMode::AbsoluteXIndex), (Instruction::LSR, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::RTS, AddressMode::Implied),(Instruction::ADC, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ADC, AddressMode::Zeropage), (Instruction::ROR, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::PLA, AddressMode::Implied), (Instruction::ADC, AddressMode::Immediate), (Instruction::ROR, AddressMode::Accumulator), (Instruction::Illegal, AddressMode::Illegal), (Instruction::JMP, AddressMode::Indirect), (Instruction::ADC, AddressMode::Absolute), (Instruction::ROR, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::BVS, AddressMode::Relative), (Instruction::ADC, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ADC, AddressMode::ZeropageXIndex), (Instruction::ROR, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SEI, AddressMode::Implied), (Instruction::ADC, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::ADC, AddressMode::AbsoluteXIndex), (Instruction::ROR, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::Illegal, AddressMode::Illegal),     (Instruction::STA, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::STY, AddressMode::Zeropage), (Instruction::STA, AddressMode::Zeropage), (Instruction::STX, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::DEY, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::TXA, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::STY, AddressMode::Absolute), (Instruction::STA, AddressMode::Absolute), (Instruction::STX, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::BCC, AddressMode::Relative), (Instruction::STA, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::STY, AddressMode::ZeropageXIndex), (Instruction::STA, AddressMode::ZeropageXIndex), (Instruction::STX, AddressMode::ZeropageYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::TYA, AddressMode::Implied), (Instruction::STA, AddressMode::AbsoluteYIndex), (Instruction::TXS, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::STA, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::LDY, AddressMode::Immediate),   (Instruction::LDA, AddressMode::IndirectXIndex), (Instruction::LDX, AddressMode::Immediate), (Instruction::Illegal, AddressMode::Illegal), (Instruction::LDY, AddressMode::Zeropage), (Instruction::LDA, AddressMode::Zeropage), (Instruction::LDX, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::TAY, AddressMode::Implied), (Instruction::LDA, AddressMode::Immediate), (Instruction::TAX, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::LDY, AddressMode::Absolute), (Instruction::LDA, AddressMode::Absolute), (Instruction::LDX, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::BCS, AddressMode::Relative), (Instruction::LDA, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::LDY, AddressMode::ZeropageXIndex), (Instruction::LDA, AddressMode::ZeropageXIndex), (Instruction::LDX, AddressMode::ZeropageYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CLV, AddressMode::Implied), (Instruction::LDA, AddressMode::AbsoluteYIndex), (Instruction::TSX, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::LDY, AddressMode::AbsoluteXIndex), (Instruction::LDA, AddressMode::AbsoluteXIndex), (Instruction::LDX, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::CPY, AddressMode::Immediate),   (Instruction::CMP, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::CPY, AddressMode::Zeropage), (Instruction::CMP, AddressMode::Zeropage), (Instruction::DEC, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::INY, AddressMode::Implied), (Instruction::CMP, AddressMode::Immediate), (Instruction::DEX, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CPY, AddressMode::Absolute), (Instruction::CMP, AddressMode::Absolute), (Instruction::DEC, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::BNE, AddressMode::Relative), (Instruction::CMP, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CMP, AddressMode::ZeropageXIndex), (Instruction::DEC, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CLD, AddressMode::Implied), (Instruction::CMP, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CMP, AddressMode::AbsoluteXIndex), (Instruction::DEC, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::CPX, AddressMode::Immediate),   (Instruction::SBC, AddressMode::IndirectXIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::CPX, AddressMode::Zeropage), (Instruction::SBC, AddressMode::Zeropage), (Instruction::INC, AddressMode::Zeropage), (Instruction::Illegal, AddressMode::Illegal), (Instruction::INX, AddressMode::Implied), (Instruction::SBC, AddressMode::Immediate), (Instruction::NOP, AddressMode::Implied), (Instruction::Illegal, AddressMode::Illegal), (Instruction::CPX, AddressMode::Absolute), (Instruction::SBC, AddressMode::Absolute), (Instruction::INC, AddressMode::Absolute), (Instruction::Illegal, AddressMode::Illegal),
-    (Instruction::BEQ, AddressMode::Relative), (Instruction::SBC, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Illegal),   (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SBC, AddressMode::ZeropageXIndex), (Instruction::INC, AddressMode::ZeropageXIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SED, AddressMode::Implied), (Instruction::SBC, AddressMode::AbsoluteYIndex), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::Illegal, AddressMode::Illegal), (Instruction::SBC, AddressMode::AbsoluteXIndex), (Instruction::INC, AddressMode::AbsoluteXIndex), (Instruction::Illegal, AddressMode::Illegal)
+    (Instruction::BRK, AddressMode::Implied),  (Instruction::ORA, AddressMode::IndirectXIndex), (Instruction::JAM, AddressMode::Accumulator),   (Instruction::SLO, AddressMode::IndirectXIndex), (Instruction::NOP, AddressMode::Zeropage), (Instruction::ORA, AddressMode::Zeropage), (Instruction::ASL, AddressMode::Zeropage), (Instruction::SLO, AddressMode::Zeropage), (Instruction::PHP, AddressMode::Implied), (Instruction::ORA, AddressMode::Immediate), (Instruction::ASL, AddressMode::Accumulator), (Instruction::ANC, AddressMode::Immediate), (Instruction::NOP, AddressMode::Absolute), (Instruction::ORA, AddressMode::Absolute), (Instruction::ASL, AddressMode::Absolute), (Instruction::SLO, AddressMode::Absolute),
+    (Instruction::BPL, AddressMode::Relative), (Instruction::ORA, AddressMode::IndirectYIndex), (Instruction::JAM, AddressMode::Accumulator),   (Instruction::SLO, AddressMode::IndirectYIndex), (Instruction::NOP, AddressMode::ZeropageXIndex), (Instruction::ORA, AddressMode::ZeropageXIndex), (Instruction::ASL, AddressMode::ZeropageXIndex), (Instruction::SLO, AddressMode::ZeropageXIndex), (Instruction::CLC, AddressMode::Implied), (Instruction::ORA, AddressMode::AbsoluteYIndex), (Instruction::NOP, AddressMode::Implied), (Instruction::SLO, AddressMode::AbsoluteYIndex), (Instruction::NOP, AddressMode::AbsoluteXIndex), (Instruction::ORA, AddressMode::AbsoluteXIndex), (Instruction::ASL, AddressMode::AbsoluteXIndex), (Instruction::SLO, AddressMode::AbsoluteXIndex),
+    (Instruction::JSR, AddressMode::Absolute), (Instruction::AND, AddressMode::IndirectXIndex), (Instruction::JAM, AddressMode::Accumulator),   (Instruction::RLA, AddressMode::IndirectXIndex), (Instruction::BIT, AddressMode::Zeropage), (Instruction::AND, AddressMode::Zeropage), (Instruction::ROL, AddressMode::Zeropage),                   (Instruction::RLA, AddressMode::Zeropage), (Instruction::PLP, AddressMode::Implied), (Instruction::AND, AddressMode::Immediate), (Instruction::ROL, AddressMode::Accumulator), (Instruction::ANC, AddressMode::Immediate), (Instruction::BIT, AddressMode::Absolute), (Instruction::AND, AddressMode::Absolute), (Instruction::ROL, AddressMode::Absolute), (Instruction::RLA, AddressMode::Absolute),
+    (Instruction::BMI, AddressMode::Relative), (Instruction::AND, AddressMode::IndirectYIndex), (Instruction::JAM, AddressMode::Accumulator),   (Instruction::RLA, AddressMode::IndirectYIndex), (Instruction::NOP, AddressMode::ZeropageXIndex), (Instruction::AND, AddressMode::ZeropageXIndex), (Instruction::ROL, AddressMode::ZeropageXIndex), (Instruction::RLA, AddressMode::ZeropageXIndex), (Instruction::SEC, AddressMode::Implied), (Instruction::AND, AddressMode::AbsoluteYIndex), (Instruction::NOP, AddressMode::Implied), (Instruction::RLA, AddressMode::AbsoluteYIndex), (Instruction::NOP, AddressMode::AbsoluteXIndex), (Instruction::AND, AddressMode::AbsoluteXIndex), (Instruction::ROL, AddressMode::AbsoluteXIndex), (Instruction::RLA, AddressMode::AbsoluteXIndex),
+    (Instruction::RTI, AddressMode::Implied),  (Instruction::EOR, AddressMode::IndirectXIndex), (Instruction::JAM, AddressMode::Accumulator),   (Instruction::SRE, AddressMode::IndirectXIndex), (Instruction::NOP, AddressMode::Zeropage), (Instruction::EOR, AddressMode::Zeropage), (Instruction::LSR, AddressMode::Zeropage),                     (Instruction::SRE, AddressMode::Zeropage), (Instruction::PHA, AddressMode::Implied), (Instruction::EOR, AddressMode::Immediate), (Instruction::LSR, AddressMode::Accumulator), (Instruction::ALR, AddressMode::Immediate), (Instruction::JMP, AddressMode::Absolute), (Instruction::EOR, AddressMode::Absolute), (Instruction::LSR, AddressMode::Absolute), (Instruction::SRE, AddressMode::Absolute),
+    (Instruction::BVC, AddressMode::Relative), (Instruction::EOR, AddressMode::IndirectYIndex), (Instruction::JAM, AddressMode::Accumulator),   (Instruction::SRE, AddressMode::IndirectYIndex), (Instruction::NOP, AddressMode::ZeropageXIndex), (Instruction::EOR, AddressMode::ZeropageXIndex), (Instruction::LSR, AddressMode::ZeropageXIndex), (Instruction::SRE, AddressMode::ZeropageXIndex), (Instruction::CLI, AddressMode::Implied), (Instruction::EOR, AddressMode::AbsoluteYIndex), (Instruction::NOP, AddressMode::Implied), (Instruction::SRE, AddressMode::AbsoluteYIndex), (Instruction::NOP, AddressMode::AbsoluteXIndex), (Instruction::EOR, AddressMode::AbsoluteXIndex), (Instruction::LSR, AddressMode::AbsoluteXIndex), (Instruction::SRE, AddressMode::AbsoluteXIndex),
+    (Instruction::RTS, AddressMode::Implied),  (Instruction::ADC, AddressMode::IndirectXIndex), (Instruction::JAM, AddressMode::Accumulator),   (Instruction::RRA, AddressMode::IndirectXIndex), (Instruction::NOP, AddressMode::Zeropage), (Instruction::ADC, AddressMode::Zeropage), (Instruction::ROR, AddressMode::Zeropage),                     (Instruction::RRA, AddressMode::Zeropage), (Instruction::PLA, AddressMode::Implied), (Instruction::ADC, AddressMode::Immediate), (Instruction::ROR, AddressMode::Accumulator), (Instruction::ARR, AddressMode::Immediate), (Instruction::JMP, AddressMode::Indirect), (Instruction::ADC, AddressMode::Absolute), (Instruction::ROR, AddressMode::Absolute), (Instruction::RRA, AddressMode::Absolute),
+    (Instruction::BVS, AddressMode::Relative), (Instruction::ADC, AddressMode::IndirectYIndex), (Instruction::JAM, AddressMode::Accumulator),   (Instruction::RRA, AddressMode::IndirectYIndex), (Instruction::NOP, AddressMode::ZeropageXIndex), (Instruction::ADC, AddressMode::ZeropageXIndex), (Instruction::ROR, AddressMode::ZeropageXIndex), (Instruction::RRA, AddressMode::ZeropageXIndex), (Instruction::SEI, AddressMode::Implied), (Instruction::ADC, AddressMode::AbsoluteYIndex), (Instruction::NOP, AddressMode::Implied), (Instruction::RRA, AddressMode::AbsoluteYIndex), (Instruction::NOP, AddressMode::AbsoluteXIndex), (Instruction::ADC, AddressMode::AbsoluteXIndex), (Instruction::ROR, AddressMode::AbsoluteXIndex), (Instruction::RRA, AddressMode::AbsoluteXIndex),
+    (Instruction::NOP, AddressMode::Immediate),(Instruction::STA, AddressMode::IndirectXIndex), (Instruction::NOP, AddressMode::Immediate),     (Instruction::SAX, AddressMode::IndirectXIndex), (Instruction::STY, AddressMode::Zeropage), (Instruction::STA, AddressMode::Zeropage), (Instruction::STX, AddressMode::Zeropage),                (Instruction::SAX, AddressMode::Zeropage), (Instruction::DEY, AddressMode::Implied), (Instruction::NOP, AddressMode::Immediate), (Instruction::TXA, AddressMode::Implied), (Instruction::ANE, AddressMode::Immediate), (Instruction::STY, AddressMode::Absolute), (Instruction::STA, AddressMode::Absolute), (Instruction::STX, AddressMode::Absolute), (Instruction::SAX, AddressMode::Absolute),
+    (Instruction::BCC, AddressMode::Relative), (Instruction::STA, AddressMode::IndirectYIndex), (Instruction::JAM, AddressMode::Accumulator),   (Instruction::SHA, AddressMode::IndirectYIndex), (Instruction::STY, AddressMode::ZeropageXIndex), (Instruction::STA, AddressMode::ZeropageXIndex), (Instruction::STX, AddressMode::ZeropageYIndex), (Instruction::SAX, AddressMode::ZeropageYIndex), (Instruction::TYA, AddressMode::Implied), (Instruction::STA, AddressMode::AbsoluteYIndex), (Instruction::TXS, AddressMode::Implied), (Instruction::TAS, AddressMode::AbsoluteYIndex), (Instruction::SHY, AddressMode::AbsoluteXIndex), (Instruction::STA, AddressMode::AbsoluteXIndex), (Instruction::SHX, AddressMode::AbsoluteXIndex), (Instruction::SHA, AddressMode::AbsoluteYIndex),
+    (Instruction::LDY, AddressMode::Immediate),(Instruction::LDA, AddressMode::IndirectXIndex), (Instruction::LDX, AddressMode::Immediate),     (Instruction::LAX, AddressMode::IndirectXIndex), (Instruction::LDY, AddressMode::Zeropage), (Instruction::LDA, AddressMode::Zeropage), (Instruction::LDX, AddressMode::Zeropage),                    (Instruction::LAX, AddressMode::Zeropage), (Instruction::TAY, AddressMode::Implied), (Instruction::LDA, AddressMode::Immediate), (Instruction::TAX, AddressMode::Implied), (Instruction::LXA, AddressMode::Immediate), (Instruction::LDY, AddressMode::Absolute), (Instruction::LDA, AddressMode::Absolute), (Instruction::LDX, AddressMode::Absolute), (Instruction::LAX, AddressMode::Absolute),
+    (Instruction::BCS, AddressMode::Relative), (Instruction::LDA, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Accumulator),(Instruction::LAX, AddressMode::IndirectYIndex), (Instruction::LDY, AddressMode::ZeropageXIndex), (Instruction::LDA, AddressMode::ZeropageXIndex), (Instruction::LDX, AddressMode::ZeropageYIndex), (Instruction::LAX, AddressMode::ZeropageYIndex), (Instruction::CLV, AddressMode::Implied), (Instruction::LDA, AddressMode::AbsoluteYIndex), (Instruction::TSX, AddressMode::Implied), (Instruction::LAS, AddressMode::AbsoluteYIndex), (Instruction::LDY, AddressMode::AbsoluteXIndex), (Instruction::LDA, AddressMode::AbsoluteXIndex), (Instruction::LDX, AddressMode::AbsoluteYIndex), (Instruction::LAX, AddressMode::AbsoluteYIndex),
+    (Instruction::CPY, AddressMode::Immediate),(Instruction::CMP, AddressMode::IndirectXIndex), (Instruction::NOP, AddressMode::Illegal),       (Instruction::DCP, AddressMode::IndirectXIndex), (Instruction::CPY, AddressMode::Zeropage), (Instruction::CMP, AddressMode::Zeropage), (Instruction::DEC, AddressMode::Zeropage),                    (Instruction::DCP, AddressMode::Zeropage), (Instruction::INY, AddressMode::Implied), (Instruction::CMP, AddressMode::Immediate), (Instruction::DEX, AddressMode::Implied), (Instruction::SBX, AddressMode::Immediate), (Instruction::CPY, AddressMode::Absolute), (Instruction::CMP, AddressMode::Absolute), (Instruction::DEC, AddressMode::Absolute), (Instruction::DCP, AddressMode::Absolute),
+    (Instruction::BNE, AddressMode::Relative), (Instruction::CMP, AddressMode::IndirectYIndex), (Instruction::NOP, AddressMode::Accumulator),   (Instruction::DCP, AddressMode::IndirectYIndex), (Instruction::NOP, AddressMode::ZeropageXIndex), (Instruction::CMP, AddressMode::ZeropageXIndex), (Instruction::DEC, AddressMode::ZeropageXIndex), (Instruction::DCP, AddressMode::ZeropageXIndex), (Instruction::CLD, AddressMode::Implied), (Instruction::CMP, AddressMode::AbsoluteYIndex), (Instruction::NOP, AddressMode::Implied), (Instruction::DCP, AddressMode::AbsoluteXIndex), (Instruction::NOP, AddressMode::AbsoluteXIndex), (Instruction::CMP, AddressMode::AbsoluteXIndex), (Instruction::DEC, AddressMode::AbsoluteXIndex), (Instruction::DCP, AddressMode::AbsoluteXIndex),
+    (Instruction::CPX, AddressMode::Immediate),(Instruction::SBC, AddressMode::IndirectXIndex), (Instruction::NOP, AddressMode::Illegal),       (Instruction::ISC, AddressMode::IndirectXIndex), (Instruction::CPX, AddressMode::Zeropage), (Instruction::SBC, AddressMode::Zeropage), (Instruction::INC, AddressMode::Zeropage),                    (Instruction::ISC, AddressMode::Zeropage), (Instruction::INX, AddressMode::Implied), (Instruction::SBC, AddressMode::Immediate), (Instruction::NOP, AddressMode::Implied), (Instruction::USBC, AddressMode::Immediate), (Instruction::CPX, AddressMode::Absolute), (Instruction::SBC, AddressMode::Absolute), (Instruction::INC, AddressMode::Absolute), (Instruction::ISC, AddressMode::Absolute),
+    (Instruction::BEQ, AddressMode::Relative), (Instruction::SBC, AddressMode::IndirectYIndex), (Instruction::NOP, AddressMode::Accumulator),   (Instruction::ISC, AddressMode::IndirectYIndex), (Instruction::NOP, AddressMode::ZeropageXIndex), (Instruction::SBC, AddressMode::ZeropageXIndex), (Instruction::INC, AddressMode::ZeropageXIndex), (Instruction::ISC, AddressMode::ZeropageXIndex), (Instruction::SED, AddressMode::Implied), (Instruction::SBC, AddressMode::AbsoluteYIndex), (Instruction::NOP, AddressMode::Implied), (Instruction::ISC, AddressMode::AbsoluteXIndex), (Instruction::NOP, AddressMode::AbsoluteXIndex), (Instruction::SBC, AddressMode::AbsoluteXIndex), (Instruction::INC, AddressMode::AbsoluteXIndex), (Instruction::ISC, AddressMode::AbsoluteXIndex)
 ];
 
 const CYCLE_TIMES: [(u8, CycleAddition); 256] = [
@@ -160,6 +160,51 @@ pub enum Instruction {
     TXS,
     /// transfer Y to accumulator
     TYA,
+    
+    // VVVV Illegal
+
+    /// AND oper + LSR
+    ALR,
+    /// AND oper + set C asl 7
+    ANC,
+    /// AND X + AND oper
+    ANE,
+    /// AND oper + ROR
+    ARR,
+    /// DEC oper + CMP oper
+    DCP,
+    /// INC oper + SBC oper
+    ISC,
+    /// LDA/TSX oper
+    LAS,
+    /// LDA oper + LDX oper
+    LAX,
+    /// Store * AND oper in A and X
+    LXA,
+    /// ROL oper + AND oper
+    RLA,
+    /// ROR oper + ADC oper
+    RRA,
+    /// A AND X -> M (what the fuck)
+    SAX,
+    /// (A AND X) - oper -> X
+    SBX,
+    /// A AND X AND (H+1) -> M (what the fuck)
+    SHA,
+    /// X AND (H+1) -> M
+    SHX,
+    /// Y AND (H+1) -> M
+    SHY,
+    /// ASL oper + ORA oper
+    SLO,
+    /// LSR oper + EOR oper
+    SRE,
+    /// A AND X -> SP, A AND X AND (H+1) -> M
+    TAS,
+    /// SBC oper + NOP (what the fuck)
+    USBC,
+    /// Jams.
+    JAM,
     Illegal
 }
 
@@ -462,7 +507,30 @@ impl<T: bus::Bus> Cpu<T> {
             Instruction::TXA => self.txa(),
             Instruction::TXS => self.txs(),
             Instruction::TYA => self.tya(),
-            Instruction::Illegal => panic!()
+            // VVVV Illegal
+            Instruction::ALR => self.alr(operand),
+            Instruction::ANC => self.anc(operand),
+            Instruction::ANE => self.ane(operand),
+            Instruction::ARR => self.arr(operand),
+            Instruction::DCP => self.dcp(address, operand),
+            Instruction::ISC => self.isc(address, operand),
+            Instruction::LAS => self.las(operand),
+            Instruction::LAX => self.lax(operand),
+            Instruction::LXA => self.lxa(operand),
+            Instruction::RLA => self.rla(address, operand),
+            Instruction::RRA => self.rra(address, operand),
+            Instruction::SAX => self.sax(address),
+            Instruction::SBX => self.sbx(operand),
+            Instruction::SHA => self.sha(address),
+            Instruction::SHX => self.shx(address),
+            Instruction::SHY => self.shy(address),
+            Instruction::SLO => self.slo(address, operand),
+            Instruction::SRE => self.sre(address, operand),
+            Instruction::TAS => self.tas(address),
+            Instruction::USBC => self.usbc(operand),
+            // TODO: Implement jam functionality? 
+            Instruction::JAM => self.nop(),
+            Instruction::Illegal => panic!(),
         }
 
         self.previous_program_counter = self.program_counter;
@@ -940,6 +1008,117 @@ impl<T: bus::Bus> Cpu<T> {
 
     pub fn nop(&mut self) {
         // its noping time!
+    }
+
+    // Illegal Instructions!
+    pub fn alr(&mut self, operand: u8) {
+        self.and(operand);
+        self.lsr(0x0, operand, true);
+    }
+
+    pub fn anc(&mut self, operand: u8) {
+        self.and(operand);
+        self.status.carry = (self.accumulator & 0x80) > 0;
+    }
+
+    pub fn ane(&mut self, operand: u8) {
+        self.accumulator = (self.accumulator | 0xFF) & self.x & operand;
+        self.status.negative = self.accumulator & 0x80 > 0;
+        self.status.zero = self.accumulator == 0;
+    }
+
+    pub fn arr(&mut self, operand: u8) {
+        self.and(operand);
+        self.ror(0x0, operand, true);
+    }
+
+    pub fn dcp(&mut self, address: u16, operand: u8) {
+        self.dec(address, operand);
+        self.cmp(operand);
+    }
+
+    pub fn isc(&mut self, address: u16, operand: u8) {
+        self.inc(address, operand);
+        self.sbc(operand);
+    }
+
+    pub fn las(&mut self, operand: u8) {
+        let result = operand & self.stack_pointer;
+        self.accumulator = result;
+        self.x = result;
+        self.stack_pointer = result;
+
+        self.status.negative = result & 0x80 > 0;
+        self.status.zero = result == 0;
+    }
+
+    pub fn lax(&mut self, operand: u8) {
+        self.lda(operand);
+        self.ldx(self.accumulator);
+    }
+
+    pub fn lxa(&mut self, operand: u8) {
+        let result = (self.accumulator | 0xFF) & operand;
+        self.accumulator = result;
+        self.x = self.accumulator;
+
+        self.status.negative = result & 0x80 > 0;
+        self.status.zero = result == 0;
+    }
+
+    pub fn rla(&mut self, address: u16, operand: u8) {
+        self.rol(address, operand, false);
+        self.and(operand);
+    }
+
+    pub fn rra(&mut self, address: u16, operand: u8) {
+        self.ror(address, operand, false);
+        self.adc(operand);
+    }
+
+    pub fn sax(&mut self, address: u16) {
+        self.bus.write(address, self.accumulator & self.x);
+    }
+
+    pub fn sbx(&mut self, operand: u8) {
+        self.x = (self.accumulator & self.x).wrapping_sub(operand);
+        self.status.negative = self.x & 0x80 > 0;
+        self.status.zero = self.x == 0;
+    }
+
+    pub fn sha(&mut self, address: u16) {
+        let high_byte = (((address & 0xFF00) >> 8) + 1) as u8;
+        self.bus.write(address, self.accumulator & self.x & high_byte);
+    }   
+
+    pub fn shx(&mut self, address: u16) {
+        let high_byte = (((address & 0xFF00) >> 8) + 1) as u8;
+        self.bus.write(address, self.x & high_byte);
+    }
+
+    pub fn shy(&mut self, address: u16) {
+        let high_byte = (((address & 0xFF00) >> 8) + 1) as u8;
+        self.bus.write(address, self.y & high_byte);    
+    }
+
+    pub fn slo(&mut self, address: u16, operand: u8) {
+        self.asl(address, operand, false);
+        self.ora(operand);
+    }
+
+    pub fn sre(&mut self, address: u16, operand: u8) {
+        self.lsr(address, operand, false);
+        self.eor(operand);
+    }
+
+    pub fn tas(&mut self, address: u16) {
+        let high_byte = (((address & 0xFF00) >> 8) + 1) as u8;
+        self.stack_pointer = self.accumulator & self.x;
+        self.bus.write(address, self.accumulator & self.x & high_byte);
+    }
+
+    pub fn usbc(&mut self, operand: u8) {
+        self.sbc(operand);
     }
 }
 
