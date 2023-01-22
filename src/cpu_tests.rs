@@ -20,6 +20,18 @@ mod cpu_tests {
         "61", "71", "E1", "F1", "65", "75", "E5", "F5", "69", "79", "E9", "F9", "6D", "7D", "ED", "FD",
     ];
 
+    const NON_ARITHMETIC_INVALID_OPCODES: [&str; 35] = [
+       /** "80","02","12","22","32","42","52","62","72","82","92","B2","C2","D2","E2","F2", "03","13","23","33","43",
+       "53","63","73","83","93","A3","B3","C3","D3", "04","14","34","44","54","64","74","D4","F4","07","17","27",
+       "37","47","57","67","77","87","97","A7","B7","C7","D7","89","1A","3A","5A","7A","DA","FA","0B","1B","2B",
+       "3B","4B","5B",**/"6B","7B","8B","9B","AB","BB","CB","DB","EB","FB","0C","1C","3C","5C","7C","9C","DC","FC","9E","0F",
+       "1F","2F","3F","4F","5F","6F","7F","8F","9F","AF","BF","CF","DF","EF","FF"
+    ];
+
+    const ARITHMETIC_INVALID_OPCODES: [&str; 7] = [
+        "E3", "F3", "FB", "EF", "FF", "E7", "F7"
+    ];
+
     #[derive(Serialize, Deserialize)]
     struct OpcodeTest {
         name: String,
@@ -168,6 +180,21 @@ mod cpu_tests {
             }
             println!("Tests for opcode {} have passed.", opcode);
             
+        }
+    }
+
+
+    #[test]
+    fn test_invalid_opcodes() {
+        for opcode in NON_ARITHMETIC_INVALID_OPCODES {
+            let tests = read_to_string(format!("test_json/{}.json", opcode.to_lowercase())).unwrap();
+            let tests: Vec<OpcodeTest> = serde_json::from_str(&tests).unwrap();
+
+            println!("Beginning tests for opcode {}...", opcode);
+            for test in tests {
+                run_test(test, true);
+            }
+            println!("Tests for opcode {} have passed.", opcode);
         }
     }
 

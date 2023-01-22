@@ -13,11 +13,11 @@ const LOOKUP_TABLE: [(Instruction, AddressMode); 256] = [
     (Instruction::NOP, AddressMode::Immediate),(Instruction::STA, AddressMode::IndirectXIndex), (Instruction::NOP, AddressMode::Immediate),     (Instruction::SAX, AddressMode::IndirectXIndex), (Instruction::STY, AddressMode::Zeropage), (Instruction::STA, AddressMode::Zeropage), (Instruction::STX, AddressMode::Zeropage),                (Instruction::SAX, AddressMode::Zeropage), (Instruction::DEY, AddressMode::Implied), (Instruction::NOP, AddressMode::Immediate), (Instruction::TXA, AddressMode::Implied), (Instruction::ANE, AddressMode::Immediate), (Instruction::STY, AddressMode::Absolute), (Instruction::STA, AddressMode::Absolute), (Instruction::STX, AddressMode::Absolute), (Instruction::SAX, AddressMode::Absolute),
     (Instruction::BCC, AddressMode::Relative), (Instruction::STA, AddressMode::IndirectYIndex), (Instruction::JAM, AddressMode::Accumulator),   (Instruction::SHA, AddressMode::IndirectYIndex), (Instruction::STY, AddressMode::ZeropageXIndex), (Instruction::STA, AddressMode::ZeropageXIndex), (Instruction::STX, AddressMode::ZeropageYIndex), (Instruction::SAX, AddressMode::ZeropageYIndex), (Instruction::TYA, AddressMode::Implied), (Instruction::STA, AddressMode::AbsoluteYIndex), (Instruction::TXS, AddressMode::Implied), (Instruction::TAS, AddressMode::AbsoluteYIndex), (Instruction::SHY, AddressMode::AbsoluteXIndex), (Instruction::STA, AddressMode::AbsoluteXIndex), (Instruction::SHX, AddressMode::AbsoluteXIndex), (Instruction::SHA, AddressMode::AbsoluteYIndex),
     (Instruction::LDY, AddressMode::Immediate),(Instruction::LDA, AddressMode::IndirectXIndex), (Instruction::LDX, AddressMode::Immediate),     (Instruction::LAX, AddressMode::IndirectXIndex), (Instruction::LDY, AddressMode::Zeropage), (Instruction::LDA, AddressMode::Zeropage), (Instruction::LDX, AddressMode::Zeropage),                    (Instruction::LAX, AddressMode::Zeropage), (Instruction::TAY, AddressMode::Implied), (Instruction::LDA, AddressMode::Immediate), (Instruction::TAX, AddressMode::Implied), (Instruction::LXA, AddressMode::Immediate), (Instruction::LDY, AddressMode::Absolute), (Instruction::LDA, AddressMode::Absolute), (Instruction::LDX, AddressMode::Absolute), (Instruction::LAX, AddressMode::Absolute),
-    (Instruction::BCS, AddressMode::Relative), (Instruction::LDA, AddressMode::IndirectYIndex), (Instruction::Illegal, AddressMode::Accumulator),(Instruction::LAX, AddressMode::IndirectYIndex), (Instruction::LDY, AddressMode::ZeropageXIndex), (Instruction::LDA, AddressMode::ZeropageXIndex), (Instruction::LDX, AddressMode::ZeropageYIndex), (Instruction::LAX, AddressMode::ZeropageYIndex), (Instruction::CLV, AddressMode::Implied), (Instruction::LDA, AddressMode::AbsoluteYIndex), (Instruction::TSX, AddressMode::Implied), (Instruction::LAS, AddressMode::AbsoluteYIndex), (Instruction::LDY, AddressMode::AbsoluteXIndex), (Instruction::LDA, AddressMode::AbsoluteXIndex), (Instruction::LDX, AddressMode::AbsoluteYIndex), (Instruction::LAX, AddressMode::AbsoluteYIndex),
-    (Instruction::CPY, AddressMode::Immediate),(Instruction::CMP, AddressMode::IndirectXIndex), (Instruction::NOP, AddressMode::Illegal),       (Instruction::DCP, AddressMode::IndirectXIndex), (Instruction::CPY, AddressMode::Zeropage), (Instruction::CMP, AddressMode::Zeropage), (Instruction::DEC, AddressMode::Zeropage),                    (Instruction::DCP, AddressMode::Zeropage), (Instruction::INY, AddressMode::Implied), (Instruction::CMP, AddressMode::Immediate), (Instruction::DEX, AddressMode::Implied), (Instruction::SBX, AddressMode::Immediate), (Instruction::CPY, AddressMode::Absolute), (Instruction::CMP, AddressMode::Absolute), (Instruction::DEC, AddressMode::Absolute), (Instruction::DCP, AddressMode::Absolute),
-    (Instruction::BNE, AddressMode::Relative), (Instruction::CMP, AddressMode::IndirectYIndex), (Instruction::NOP, AddressMode::Accumulator),   (Instruction::DCP, AddressMode::IndirectYIndex), (Instruction::NOP, AddressMode::ZeropageXIndex), (Instruction::CMP, AddressMode::ZeropageXIndex), (Instruction::DEC, AddressMode::ZeropageXIndex), (Instruction::DCP, AddressMode::ZeropageXIndex), (Instruction::CLD, AddressMode::Implied), (Instruction::CMP, AddressMode::AbsoluteYIndex), (Instruction::NOP, AddressMode::Implied), (Instruction::DCP, AddressMode::AbsoluteXIndex), (Instruction::NOP, AddressMode::AbsoluteXIndex), (Instruction::CMP, AddressMode::AbsoluteXIndex), (Instruction::DEC, AddressMode::AbsoluteXIndex), (Instruction::DCP, AddressMode::AbsoluteXIndex),
-    (Instruction::CPX, AddressMode::Immediate),(Instruction::SBC, AddressMode::IndirectXIndex), (Instruction::NOP, AddressMode::Illegal),       (Instruction::ISC, AddressMode::IndirectXIndex), (Instruction::CPX, AddressMode::Zeropage), (Instruction::SBC, AddressMode::Zeropage), (Instruction::INC, AddressMode::Zeropage),                    (Instruction::ISC, AddressMode::Zeropage), (Instruction::INX, AddressMode::Implied), (Instruction::SBC, AddressMode::Immediate), (Instruction::NOP, AddressMode::Implied), (Instruction::USBC, AddressMode::Immediate), (Instruction::CPX, AddressMode::Absolute), (Instruction::SBC, AddressMode::Absolute), (Instruction::INC, AddressMode::Absolute), (Instruction::ISC, AddressMode::Absolute),
-    (Instruction::BEQ, AddressMode::Relative), (Instruction::SBC, AddressMode::IndirectYIndex), (Instruction::NOP, AddressMode::Accumulator),   (Instruction::ISC, AddressMode::IndirectYIndex), (Instruction::NOP, AddressMode::ZeropageXIndex), (Instruction::SBC, AddressMode::ZeropageXIndex), (Instruction::INC, AddressMode::ZeropageXIndex), (Instruction::ISC, AddressMode::ZeropageXIndex), (Instruction::SED, AddressMode::Implied), (Instruction::SBC, AddressMode::AbsoluteYIndex), (Instruction::NOP, AddressMode::Implied), (Instruction::ISC, AddressMode::AbsoluteXIndex), (Instruction::NOP, AddressMode::AbsoluteXIndex), (Instruction::SBC, AddressMode::AbsoluteXIndex), (Instruction::INC, AddressMode::AbsoluteXIndex), (Instruction::ISC, AddressMode::AbsoluteXIndex)
+    (Instruction::BCS, AddressMode::Relative), (Instruction::LDA, AddressMode::IndirectYIndex), (Instruction::JAM, AddressMode::Accumulator),(Instruction::LAX, AddressMode::IndirectYIndex), (Instruction::LDY, AddressMode::ZeropageXIndex), (Instruction::LDA, AddressMode::ZeropageXIndex), (Instruction::LDX, AddressMode::ZeropageYIndex), (Instruction::LAX, AddressMode::ZeropageYIndex), (Instruction::CLV, AddressMode::Implied), (Instruction::LDA, AddressMode::AbsoluteYIndex), (Instruction::TSX, AddressMode::Implied), (Instruction::LAS, AddressMode::AbsoluteYIndex), (Instruction::LDY, AddressMode::AbsoluteXIndex), (Instruction::LDA, AddressMode::AbsoluteXIndex), (Instruction::LDX, AddressMode::AbsoluteYIndex), (Instruction::LAX, AddressMode::AbsoluteYIndex),
+    (Instruction::CPY, AddressMode::Immediate),(Instruction::CMP, AddressMode::IndirectXIndex), (Instruction::NOP, AddressMode::Immediate),       (Instruction::DCP, AddressMode::IndirectXIndex), (Instruction::CPY, AddressMode::Zeropage), (Instruction::CMP, AddressMode::Zeropage), (Instruction::DEC, AddressMode::Zeropage),                    (Instruction::DCP, AddressMode::Zeropage), (Instruction::INY, AddressMode::Implied), (Instruction::CMP, AddressMode::Immediate), (Instruction::DEX, AddressMode::Implied), (Instruction::SBX, AddressMode::Immediate), (Instruction::CPY, AddressMode::Absolute), (Instruction::CMP, AddressMode::Absolute), (Instruction::DEC, AddressMode::Absolute), (Instruction::DCP, AddressMode::Absolute),
+    (Instruction::BNE, AddressMode::Relative), (Instruction::CMP, AddressMode::IndirectYIndex), (Instruction::JAM, AddressMode::Accumulator),   (Instruction::DCP, AddressMode::IndirectYIndex), (Instruction::NOP, AddressMode::ZeropageXIndex), (Instruction::CMP, AddressMode::ZeropageXIndex), (Instruction::DEC, AddressMode::ZeropageXIndex), (Instruction::DCP, AddressMode::ZeropageXIndex), (Instruction::CLD, AddressMode::Implied), (Instruction::CMP, AddressMode::AbsoluteYIndex), (Instruction::NOP, AddressMode::Implied), (Instruction::DCP, AddressMode::AbsoluteXIndex), (Instruction::NOP, AddressMode::AbsoluteXIndex), (Instruction::CMP, AddressMode::AbsoluteXIndex), (Instruction::DEC, AddressMode::AbsoluteXIndex), (Instruction::DCP, AddressMode::AbsoluteXIndex),
+    (Instruction::CPX, AddressMode::Immediate),(Instruction::SBC, AddressMode::IndirectXIndex), (Instruction::NOP, AddressMode::Immediate),       (Instruction::ISC, AddressMode::IndirectXIndex), (Instruction::CPX, AddressMode::Zeropage), (Instruction::SBC, AddressMode::Zeropage), (Instruction::INC, AddressMode::Zeropage),                    (Instruction::ISC, AddressMode::Zeropage), (Instruction::INX, AddressMode::Implied), (Instruction::SBC, AddressMode::Immediate), (Instruction::NOP, AddressMode::Implied), (Instruction::USBC, AddressMode::Immediate), (Instruction::CPX, AddressMode::Absolute), (Instruction::SBC, AddressMode::Absolute), (Instruction::INC, AddressMode::Absolute), (Instruction::ISC, AddressMode::Absolute),
+    (Instruction::BEQ, AddressMode::Relative), (Instruction::SBC, AddressMode::IndirectYIndex), (Instruction::JAM, AddressMode::Accumulator),   (Instruction::ISC, AddressMode::IndirectYIndex), (Instruction::NOP, AddressMode::ZeropageXIndex), (Instruction::SBC, AddressMode::ZeropageXIndex), (Instruction::INC, AddressMode::ZeropageXIndex), (Instruction::ISC, AddressMode::ZeropageXIndex), (Instruction::SED, AddressMode::Implied), (Instruction::SBC, AddressMode::AbsoluteYIndex), (Instruction::NOP, AddressMode::Implied), (Instruction::ISC, AddressMode::AbsoluteXIndex), (Instruction::NOP, AddressMode::AbsoluteXIndex), (Instruction::SBC, AddressMode::AbsoluteXIndex), (Instruction::INC, AddressMode::AbsoluteXIndex), (Instruction::ISC, AddressMode::AbsoluteXIndex)
 ];
 
 const CYCLE_TIMES: [(u8, CycleAddition); 256] = [
@@ -410,7 +410,7 @@ impl<T: bus::Bus> Cpu<T> {
                 (self.bus.read(self.x.wrapping_add(low_byte) as u16), self.x.wrapping_add(low_byte) as u16, false)
             },
             AddressMode::ZeropageYIndex => {
-                let low_byte = self.bus.read(self.program_counter + 1);
+                let low_byte = self.bus.read(self.program_counter.wrapping_add(1));
                 self.program_counter = self.program_counter.wrapping_add(1);
                 (self.bus.read(self.y.wrapping_add(low_byte) as u16), self.y.wrapping_add(low_byte) as u16, false)
             },
@@ -511,7 +511,7 @@ impl<T: bus::Bus> Cpu<T> {
             Instruction::ALR => self.alr(operand),
             Instruction::ANC => self.anc(operand),
             Instruction::ANE => self.ane(operand),
-            Instruction::ARR => self.arr(operand),
+            Instruction::ARR => self.arr(address, operand),
             Instruction::DCP => self.dcp(address, operand),
             Instruction::ISC => self.isc(address, operand),
             Instruction::LAS => self.las(operand),
@@ -529,7 +529,9 @@ impl<T: bus::Bus> Cpu<T> {
             Instruction::TAS => self.tas(address),
             Instruction::USBC => self.usbc(operand),
             // TODO: Implement jam functionality? 
-            Instruction::JAM => self.nop(),
+            Instruction::JAM => {
+                return 0;
+            },
             Instruction::Illegal => panic!(),
         }
 
@@ -1027,19 +1029,25 @@ impl<T: bus::Bus> Cpu<T> {
         self.status.zero = self.accumulator == 0;
     }
 
-    pub fn arr(&mut self, operand: u8) {
+    // FIXME: Problem child! WHERE DOES BIT 7 come from?
+    pub fn arr(&mut self, address: u16, operand: u8) {
+        let bit7_1 = (operand & 0x80) > 0;
         self.and(operand);
-        self.ror(0x0, operand, true);
+        let bit7_2 = (self.accumulator& 0x80) > 0;
+        self.ror(0x0, self.bus.read(address), true);
+        let bit7_3 = (self.bus.read(address) & 0x80) > 0;
+        let bit7_4 = (self.accumulator & 0x80) > 0;
+        self.status.carry = bit7_4;
     }
 
     pub fn dcp(&mut self, address: u16, operand: u8) {
         self.dec(address, operand);
-        self.cmp(operand);
+        self.cmp(self.bus.read(address));
     }
 
     pub fn isc(&mut self, address: u16, operand: u8) {
         self.inc(address, operand);
-        self.sbc(operand);
+        self.sbc(self.bus.read(address));
     }
 
     pub fn las(&mut self, operand: u8) {
@@ -1068,12 +1076,12 @@ impl<T: bus::Bus> Cpu<T> {
 
     pub fn rla(&mut self, address: u16, operand: u8) {
         self.rol(address, operand, false);
-        self.and(operand);
+        self.and(self.bus.read(address));
     }
 
     pub fn rra(&mut self, address: u16, operand: u8) {
         self.ror(address, operand, false);
-        self.adc(operand);
+        self.adc(self.bus.read(address));
     }
 
     pub fn sax(&mut self, address: u16) {
@@ -1103,12 +1111,12 @@ impl<T: bus::Bus> Cpu<T> {
 
     pub fn slo(&mut self, address: u16, operand: u8) {
         self.asl(address, operand, false);
-        self.ora(operand);
+        self.ora(self.bus.read(address));
     }
 
     pub fn sre(&mut self, address: u16, operand: u8) {
         self.lsr(address, operand, false);
-        self.eor(operand);
+        self.eor(self.bus.read(address));
     }
 
     pub fn tas(&mut self, address: u16) {
