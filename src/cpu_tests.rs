@@ -5,7 +5,7 @@ mod cpu_tests {
 
     use crate::{cpu::{Cpu, StatusRegister}, bus::{BasicBus, Bus}};
 
-    const NOT_ARITHMETIC_VALID_OPCODES: [&str; 131] = [
+    const NON_ARITHMETIC_VALID_OPCODES: [&str; 131]= [
         "00", "10", "20", "30", "40", "50", "60", "70", "A0", "B0", "C0", "D0", "E0", "F0", "01", "11", "21", "31", 
         "41", "51","81", "91", "A1", "B1", "C1", "D1",  "A2", "24", "94", "A4", "B4", "C4", 
         "E4", "05", "15", "25", "35", "45", "55", "85", "95", "A5", "B5", "C5", "D5","06", "16" ,
@@ -16,19 +16,19 @@ mod cpu_tests {
         "0E", "1E", "2E", "3E", "4E", "5E", "6E", "7E", "8E", "AE", "BE", "CE", "EE", "FE"
     ];
 
-    const ARITHMETIC_VALID_OPCODES: [&str; 16] = [
+    const ARITHMETIC_VALID_OPCODES: [&str; 16]= [
         "61", "71", "E1", "F1", "65", "75", "E5", "F5", "69", "79", "E9", "F9", "6D", "7D", "ED", "FD",
     ];
 
-    const NON_ARITHMETIC_INVALID_OPCODES: [&str; 35] = [
-       /** "80","02","12","22","32","42","52","62","72","82","92","B2","C2","D2","E2","F2", "03","13","23","33","43",
+    const NON_ARITHMETIC_INVALID_OPCODES: [&str; 101]= [
+       "80","02","12","22","32","42","52","62","72","82","92","B2","C2","D2","E2","F2", "03","13","23","33","43",
        "53","63","73","83","93","A3","B3","C3","D3", "04","14","34","44","54","64","74","D4","F4","07","17","27",
        "37","47","57","67","77","87","97","A7","B7","C7","D7","89","1A","3A","5A","7A","DA","FA","0B","1B","2B",
-       "3B","4B","5B",**/"6B","7B","8B","9B","AB","BB","CB","DB","EB","FB","0C","1C","3C","5C","7C","9C","DC","FC","9E","0F",
+       "3B","4B","5B","6B","7B","8B","9B","AB","BB","CB","DB","EB","FB","0C","1C","3C","5C","7C","9C","DC","FC","9E","0F",
        "1F","2F","3F","4F","5F","6F","7F","8F","9F","AF","BF","CF","DF","EF","FF"
     ];
 
-    const ARITHMETIC_INVALID_OPCODES: [&str; 7] = [
+    const ARITHMETIC_INVALID_OPCODES: [&str; 7]= [
         "E3", "F3", "FB", "EF", "FF", "E7", "F7"
     ];
 
@@ -68,46 +68,6 @@ mod cpu_tests {
         println!("Final (expected):\n{}", test.r#final);
         println!("Final (actual):\n{}", actual);
         panic!();
-    }
-
-    fn run_test(test: OpcodeTest, panic: bool) -> (bool, u8) {
-        let mut cpu: Cpu<BasicBus> = Cpu::new(BasicBus::default());
-        cpu.program_counter = test.initial.pc;
-        cpu.stack_pointer = test.initial.s;
-        cpu.accumulator = test.initial.a;
-        cpu.x = test.initial.x;
-        cpu.y = test.initial.y;
-        cpu.status = StatusRegister::from_u8(test.initial.p);
-
-        for (address, data) in &test.initial.ram {
-            cpu.bus.write(*address, *data)
-        }
-
-        let cycles = cpu.step();
-        let actual = CpuState {
-            pc: cpu.program_counter,
-            s: cpu.stack_pointer,
-            a: cpu.accumulator,
-            x: cpu.x,
-            y: cpu.y,
-            p: cpu.status.to_u8(),
-            ram: {
-                let mut vec: Vec<(u16, u8)> = vec![];
-                for (address, _) in &test.r#final.ram {
-                    vec.push((*address, cpu.bus.read(*address)));
-                }
-                vec
-            }
-        };
-
-        if actual != test.r#final {
-            if panic {
-                test_fail(test, actual);
-            }
-            (false, cycles)
-        } else {
-            (true, cycles)
-        }
     }
 
     fn run_and_time_test(test: OpcodeTest, panic: bool) -> (bool, Duration, u8) {
@@ -153,64 +113,20 @@ mod cpu_tests {
         }
     }
 
-    #[test]
-    fn test_non_arithmetic_valid_opcodes() {
-        for opcode in NOT_ARITHMETIC_VALID_OPCODES {
-            let tests = read_to_string(format!("test_json/{}.json", opcode.to_lowercase())).unwrap();
-            let tests: Vec<OpcodeTest> = serde_json::from_str(&tests).unwrap();
-
-            println!("Beginning tests for opcode {}...", opcode);
-            for test in tests {
-                run_test(test, true);
-            }
-            println!("Tests for opcode {} have passed.", opcode);
-            
-        }
-    }
-
-    #[test]
-    fn test_arithmetic_valid_opcodes() {
-        for opcode in ARITHMETIC_VALID_OPCODES {
-            let tests = read_to_string(format!("test_json/{}.json", opcode)).unwrap();
-            let tests: Vec<OpcodeTest> = serde_json::from_str(&tests).unwrap();
-
-            println!("Beginning tests for opcode {}...", opcode);
-            for test in tests {
-                run_test(test, true);
-            }
-            println!("Tests for opcode {} have passed.", opcode);
-            
-        }
-    }
-
-
-    #[test]
-    fn test_invalid_opcodes() {
-        for opcode in NON_ARITHMETIC_INVALID_OPCODES {
-            let tests = read_to_string(format!("test_json/{}.json", opcode.to_lowercase())).unwrap();
-            let tests: Vec<OpcodeTest> = serde_json::from_str(&tests).unwrap();
-
-            println!("Beginning tests for opcode {}...", opcode);
-            for test in tests {
-                run_test(test, true);
-            }
-            println!("Tests for opcode {} have passed.", opcode);
-        }
-    }
-
-    #[test]
-    fn grade_non_arithmetic_valid_opcodes() {
+    fn run(tests: &Vec<&str>, verbose: bool, panic: bool) {
         let mut passed = 0;
         let mut failed = 0;
         let mut duration = Duration::new(0, 0);
         let mut cycles: usize = 0;
-        for opcode in NOT_ARITHMETIC_VALID_OPCODES {
+        for opcode in tests {
             let tests = read_to_string(format!("test_json/{}.json", opcode.to_lowercase())).unwrap();
             let tests: Vec<OpcodeTest> = serde_json::from_str(&tests).unwrap();
 
-            println!("Beginning tests for opcode {}...", opcode);
+            if verbose {
+                println!("Beginning tests for opcode {}...", opcode);
+            }
             for test in tests {
-                let (success, time_taken, cycles_taken) = run_and_time_test(test, false);
+                let (success, time_taken, cycles_taken) = run_and_time_test(test, panic);
                 if success {
                     passed += 1;
                 } else {
@@ -219,34 +135,36 @@ mod cpu_tests {
                 duration += time_taken;
                 cycles += cycles_taken as usize;
             }
-            println!("Tests for opcode {} have finished.", opcode);
-            
+            if verbose {
+                println!("Tests for opcode {} have finished.", opcode);
+            }            
         }
-        println!("Total: {}, Passed: {}, Failed: {}, Grade: {}%", passed + failed, passed, failed, (passed as f32 / (passed as f32 + failed as f32)) * 100.0);
-        println!("Total Time: {:?}, Time/Step: {:?}", duration, duration / (passed + failed));
-        println!("Total Cycles: {:?}, Lower Bound Max Clock Rate: {:?} Hz", cycles, cycles as f64 / duration.as_secs_f64());
+
+        if verbose {
+            println!("Total: {}, Passed: {}, Failed: {}, Grade: {}%", passed + failed, passed, failed, (passed as f32 / (passed as f32 + failed as f32)) * 100.0);
+            println!("Total Time: {:?}, Time/Step: {:?}", duration, duration / (passed + failed));
+            println!("Total Cycles: {:?}, Lower Bound Max Clock Rate: {:?} Hz", cycles, cycles as f64 / duration.as_secs_f64());
+        }
+      
+    }
+
+    #[test]
+    fn grade_non_arithmetic_valid_opcodes() {
+        run(&NON_ARITHMETIC_VALID_OPCODES.to_vec(), true, false);
     }
 
     #[test]
     fn grade_arithmetic_valid_opcodes() {
-        let mut passed = 0;
-        let mut failed = 0;
-        for opcode in ARITHMETIC_VALID_OPCODES {
-            let tests = read_to_string(format!("test_json/{}.json", opcode)).unwrap();
-            let tests: Vec<OpcodeTest> = serde_json::from_str(&tests).unwrap();
+        run(&ARITHMETIC_VALID_OPCODES.to_vec(), true, false);
+    }
 
-            println!("Beginning tests for opcode {}...", opcode);
-            for test in tests {
-                let (success, _) = run_test(test, false);
-                if success {
-                    passed += 1;
-                } else {
-                    failed += 1;
-                };
-            }
-            println!("Tests for opcode {} have finished.", opcode);
-            
-        }
-        println!("Total: {}, Passed: {}, Failed: {}, Grade: {}%", passed + failed, passed, failed, (passed as f32 / (passed as f32 + failed as f32)) * 100.0);
+    #[test]
+    fn grade_non_arithmetic_invalid_opcodes() {
+        run(&NON_ARITHMETIC_INVALID_OPCODES.to_vec(), true, false);
+    }
+
+    #[test]
+    fn grade_arithmetic_invalid_opcodes() {
+        run(&ARITHMETIC_INVALID_OPCODES.to_vec(), true, false);        
     }
 }
