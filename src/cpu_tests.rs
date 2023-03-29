@@ -155,7 +155,7 @@ mod cpu_tests {
 
     #[test]
     fn grade_arithmetic_valid_opcodes() {
-        run(&ARITHMETIC_VALID_OPCODES.to_vec(), true, false);
+        run(&ARITHMETIC_VALID_OPCODES.to_vec(), true, true);
     }
 
     #[test]

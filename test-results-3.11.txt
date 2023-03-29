@@ -1,0 +1,20 @@
+
+Total: 70000, Passed: 45052, Failed: 24948, Grade: 64.36%
+Total Time: 22.7277ms, Time/Step: 324ns
+Total Cycles: 470000, Lower Bound Max Clock Rate: 20679611.223309003 Hz
+arithmetic_invalid_opcodes ^^^^^^^^^
+
+Total: 160000, Passed: 140074, Failed: 19926, Grade: 87.54625%
+Total Time: 40.3075ms, Time/Step: 251ns
+Total Cycles: 670091, Lower Bound Max Clock Rate: 16624474.353408173 Hz
+arithmetic_valid_opcodes ^^^^^^^^^^
+
+Total: 1010000, Passed: 953051, Failed: 56949, Grade: 94.36148%
+Total Time: 206.5053ms, Time/Step: 204ns
+Total Cycles: 4314923, Lower Bound Max Clock Rate: 20894974.60839988 Hz
+non_arithmetic_invalid_opcodes ^^^^^^^^^
+
+Total: 1309995, Passed: 1309995, Failed: 0, Grade: 100%
+Total Time: 236.8135ms, Time/Step: 180ns
+Total Cycles: 5239993, Lower Bound Max Clock Rate: 22127087.349327635 Hz
+non_arithmetic_valid_opcodes ^^^^^^^^^^

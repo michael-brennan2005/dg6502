@@ -494,7 +494,7 @@ impl<T: bus::Bus> Cpu<T> {
             },
             Instruction::RTS => self.rts(),
             Instruction::RTI => self.rti(),
-            Instruction::SBC => self.sbc(operand),
+            Instruction::SBC => self.sbc(operand as i8),
             Instruction::SEC => self.sec(),
             Instruction::SED => self.sed(),
             Instruction::SEI => self.sei(),
@@ -753,25 +753,73 @@ impl<T: bus::Bus> Cpu<T> {
         self.accumulator = result as u8;
     }
 
-    pub fn sbc(&mut self, operand: u8) {
-        let mut result = u16::from(self.accumulator) + u16::from(!operand) + self.status.carry as u16;
-        self.status.carry = result > u16::from(u8::max_value());
-        self.status.zero = result as u8 == 0;
-        self.status.overflow = ((self.accumulator ^ operand) & (self.accumulator ^ result as u8) & 0x80) > 0;
-        self.status.negative = (result as u8 & 0x80) > 0;
-        if self.status.decimal {
-            let operand = operand as i16;
-            let mut sum = (self.accumulator & 0xF) as i16 - (operand & 0xF) + self.status.carry as i16 - 1;
-            if sum < 0 {
-                sum = ((sum - 0x6) & 0xF) - 0x10;
-            }
-            let mut sum = (self.accumulator & 0xF0) as i16 - (operand & 0xF0) + sum;
-            if sum < 0 {
-                sum -= 0x60;
-            }
-            result = (sum & 0xFF) as u16;
-        }
+    pub fn sbc(&mut self, operand: i8) {
+        println!("NEGATIVE IS: {}", self.status.negative);
+        let nc: i8 = if self.status.carry {
+            0
+        } else {
+            1
+        };
+
+        let a_before: i8 = self.accumulator as i8;
+
+        let a_after = a_before.wrapping_sub(operand).wrapping_sub(nc);
+
+        let over =
+            ((nc == 0 && operand < 0) || (nc == 1 && operand < -1)) && a_before >= 0 && a_after < 0;
+
+        let under =
+            (a_before < 0) && (0i8.wrapping_sub(operand).wrapping_sub(nc) < 0) && a_after >= 0;
+
+        let did_overflow = over || under;
+
+
+        let bcd1: i8 = if (a_before & 0x0f).wrapping_sub(nc) < (operand & 0x0f) {
+            0x06
+        } else {
+            0x00
+        };
+
+        let bcd2: i8 = if (a_after.wrapping_sub(bcd1) as u8 & 0xf0) > 0x90 {
+            0x60
+        } else {
+            0x00
+        };
+
+        let result: i8 = if self.status.decimal {
+            a_after.wrapping_sub(bcd1).wrapping_sub(bcd2)
+        } else {
+            a_after
+        };
+
+        // The carry flag is set on unsigned overflow.
+        let did_carry = !(result as u8) > (a_before as u8);
+
+        self.status.carry = did_carry;
+        self.status.overflow = did_overflow;
+        self.status.negative = result < 0;
+
         self.accumulator = result as u8;
+        println!("NEGATIVE IS: {}", self.status.negative);
+        //let mut result = u16::from(self.accumulator) + u16::from(!operand) + (if self.status.carry { 1 } else { 0 });
+        //let mut result = u16::from(self.accumulator) + u16::from(!operand) + (if self.status.carry { 1 } else { 0 });
+        //self.status.carry = result > u16::from(u8::max_value());
+        //self.status.zero = result as u8 == 0;
+        //self.status.overflow = ((self.accumulator ^ operand) & (self.accumulator ^ result as u8) & 0x80) > 0;
+        //self.status.negative = (result as u8 & 0x80) > 0;
+        //if self.status.decimal {
+        //    let operand = operand as i16;
+        //    let mut sum = (self.accumulator & 0xF) as i16 - (operand & 0xF) + self.status.carry as i16 - 1;
+        //    if sum < 0 {
+        //        sum = ((sum - 0x6) & 0xF) - 0x10;
+        //    }
+        //    let mut sum = (self.accumulator & 0xF0) as i16 - (operand & 0xF0) + sum;
+        //    if sum < 0 {
+        //        sum -= 0x60;
+        //    }
+        //    result = (sum & 0xFF) as u16;
+        //}
+        //self.accumulator = result as u8;
     }
 
     // Logical operations
@@ -1047,7 +1095,7 @@ impl<T: bus::Bus> Cpu<T> {
 
     pub fn isc(&mut self, address: u16, operand: u8) {
         self.inc(address, operand);
-        self.sbc(self.bus.read(address));
+        self.sbc(self.bus.read(address) as i8);
     }
 
     pub fn las(&mut self, operand: u8) {
@@ -1126,7 +1174,7 @@ impl<T: bus::Bus> Cpu<T> {
     }
 
     pub fn usbc(&mut self, operand: u8) {
-        self.sbc(operand);
+        self.sbc(operand as i8);
     }
 }
 
