@@ -1,31 +1,38 @@
-use std::{fs::File, io::{BufReader, Read}};
+use std::{fs::File, io::{BufReader, Read, Write, stdout}};
 
-use crate::bus::Bus;
+use bus::BasicCPUMemory;
+use cpu::Cpu;
+use crossterm::{ExecutableCommand, style::Print, terminal::Clear, execute, event::{read, Event, KeyCode, KeyEventKind}};
 
 pub mod bus;
 pub mod cpu;
 mod cpu_tests;
 
 fn main() {
-    let file = File::open("nestest.nes").unwrap();
-    let mut reader = BufReader::new(file);
-    let mut buffer: Vec<u8> = Vec::new();
-    reader.read_to_end(&mut buffer).unwrap();
-    let bus = bus::NESTestBus::try_from(buffer).unwrap();
+    let memory = BasicCPUMemory::from_file(&"test_exe/6502_functional_test.bin".to_string()).unwrap();
+    let mut cpu = Cpu::new(memory);
 
-    let mut cpu6502 = cpu::Cpu::new(bus);
-    cpu6502.program_counter = 0xC000;
-
+    cpu.program_counter = 0x400;
     loop {
-        cpu6502.step();
-        println!("PC: {:#06X} X: {:#04X} Y: {:#04X} ACC: {:#04X}, SP: {:#04X}, STATUS: {:#010b}, 0x02: {:#04X}, 0x03: {:#04X}",
-            cpu6502.program_counter,
-            cpu6502.x,
-            cpu6502.y,
-            cpu6502.accumulator,
-            cpu6502.stack_pointer,
-            cpu6502.status.to_u8(),
-            cpu6502.bus.read(0x2),
-            cpu6502.bus.read(0x3));
+        execute!(
+            stdout(),
+            Clear(crossterm::terminal::ClearType::All),
+            Print(&cpu),
+            Print("Z - 1 steps X - 100 steps C - 1K steps V - 1M steps\n")
+        );
+
+        match read().unwrap() {
+            Event::Key(event) => {
+                if event.kind == KeyEventKind::Press {
+                    match event.code {
+                        KeyCode::Char('z') => {
+                            cpu.step();
+                        },
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 }

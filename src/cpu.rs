@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::bus;
 
 
@@ -278,7 +280,7 @@ mod status_register_test {
         assert_eq!(status.to_u8(), 106);
     }
 }
-pub struct Cpu<T: bus::Bus> {
+pub struct Cpu<T: bus::CPUMemory> {
     pub previous_program_counter: u16,
     pub program_counter: u16,
     pub accumulator: u8,
@@ -289,7 +291,19 @@ pub struct Cpu<T: bus::Bus> {
     pub bus: T
 }
 
-impl<T: bus::Bus> Cpu<T> {
+impl<T: bus::CPUMemory> Display for Cpu<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:5}| {:6} | {:18} | {:6}\n", "REG", "HEX", "BIN", "DEC")?;
+        write!(f, "{:-<43}\n", "")?;
+        write!(f, "{:5}| {:#6X} | {:#18b} | {:6}\n", "PC", self.program_counter, self.program_counter, self.program_counter)?;
+        write!(f, "{:5}| {:#6X} | {:#18b} | {:6}\n", "ACC", self.accumulator, self.accumulator, self.accumulator)?;
+        write!(f, "{:5}| {:#6X} | {:#18b} | {:6}\n", "X", self.x, self.x, self.x)?;
+        write!(f, "{:5}| {:#6X} | {:#18b} | {:6}\n", "Y", self.y, self.y, self.y)?;
+        write!(f, "{:5}| {:#6X} | {:#18b} | {:6}\n", "STAT", self.status.to_u8(), self.status.to_u8(), self.status.to_u8()) 
+    }
+}
+
+impl<T: bus::CPUMemory> Cpu<T> {
     pub fn new(bus: T) -> Self {
         Cpu {
             previous_program_counter: 0x0,
