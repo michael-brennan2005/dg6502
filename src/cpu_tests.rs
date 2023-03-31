@@ -70,8 +70,8 @@ mod cpu_tests {
         panic!();
     }
 
-    fn run_and_time_test(test: OpcodeTest, panic: bool, ignore_off_by_one: bool) -> (bool, Duration, u8) {
-        let mut cpu: Cpu<BasicCPUMemory> = Cpu::new(BasicCPUMemory::default());
+    fn run_and_time_test(test: OpcodeTest, panic: bool, ignore_off_by_one: bool) -> (bool, Duration, usize) {
+        let mut cpu: Cpu<BasicCPUMemory> = Cpu::new(BasicCPUMemory::default(), crate::cpu::CpuConfig { decimal_mode: true }, StatusRegister::new());
         cpu.program_counter = test.initial.pc;
         cpu.stack_pointer = test.initial.s;
         cpu.accumulator = test.initial.a;

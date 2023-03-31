@@ -230,18 +230,18 @@ pub enum AddressMode {
 
 #[derive(Debug, Clone, Copy)]
 pub struct StatusRegister {
-    negative: bool,
-    overflow: bool,
-    ignored: bool,
-    _break: bool,
-    decimal: bool,
-    interrupt: bool,
-    zero: bool,
-    carry: bool
+    pub negative: bool,
+    pub overflow: bool,
+    pub ignored: bool,
+    pub _break: bool,
+    pub decimal: bool,
+    pub interrupt: bool,
+    pub zero: bool,
+    pub carry: bool
 }
 
 impl StatusRegister {
-    fn new() -> Self {
+    pub fn new() -> Self {
         StatusRegister { negative: false, overflow: false, ignored: false, _break: false, decimal: false, interrupt: false, zero: false, carry: false }
     }
 
@@ -280,6 +280,11 @@ mod status_register_test {
         assert_eq!(status.to_u8(), 106);
     }
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct CpuConfig {
+    pub decimal_mode: bool
+}
 pub struct Cpu<T: bus::CPUMemory> {
     pub previous_program_counter: u16,
     pub program_counter: u16,
@@ -288,7 +293,8 @@ pub struct Cpu<T: bus::CPUMemory> {
     pub y: u8,
     pub status: StatusRegister,
     pub stack_pointer: u8,
-    pub bus: T
+    pub bus: T,
+    pub config: CpuConfig
 }
 
 impl<T: bus::CPUMemory> Display for Cpu<T> {
@@ -299,21 +305,23 @@ impl<T: bus::CPUMemory> Display for Cpu<T> {
         write!(f, "{:5}| {:#6X} | {:#18b} | {:6}\n", "ACC", self.accumulator, self.accumulator, self.accumulator)?;
         write!(f, "{:5}| {:#6X} | {:#18b} | {:6}\n", "X", self.x, self.x, self.x)?;
         write!(f, "{:5}| {:#6X} | {:#18b} | {:6}\n", "Y", self.y, self.y, self.y)?;
-        write!(f, "{:5}| {:#6X} | {:#18b} | {:6}\n", "STAT", self.status.to_u8(), self.status.to_u8(), self.status.to_u8()) 
+        write!(f, "{:5}| {:#6X} | {:#18b} | {:6}\n", "STAT", self.status.to_u8(), self.status.to_u8(), self.status.to_u8())?;
+        write!(f, "{:5}| {:#6X} | {:#18b} | {:6}\n", "SP", self.stack_pointer, self.stack_pointer, self.stack_pointer) 
     }
 }
 
 impl<T: bus::CPUMemory> Cpu<T> {
-    pub fn new(bus: T) -> Self {
+    pub fn new(bus: T, config: CpuConfig, status: StatusRegister) -> Self {
         Cpu {
             previous_program_counter: 0x0,
             program_counter: 0x400,
             accumulator: 0,
             x: 0,
             y: 0,
-            status: StatusRegister::new(),
-            stack_pointer: 255,
-            bus
+            status,
+            stack_pointer: 0xFD,
+            bus,
+            config
         }
     }
 
@@ -443,7 +451,7 @@ impl<T: bus::CPUMemory> Cpu<T> {
         self.program_counter = new_address;
     }
 
-    pub fn step(&mut self) -> u8 {
+    pub fn step(&mut self) -> usize {
         let opcode = self.bus.read(self.program_counter);
 
         let high_nibble = (opcode & 0xF0) >> 4;
@@ -554,19 +562,19 @@ impl<T: bus::CPUMemory> Cpu<T> {
 
         let (cycles, addition) = CYCLE_TIMES[(high_nibble * 16 + low_nibble) as usize];
         match addition {
-            CycleAddition::None => cycles,
+            CycleAddition::None => cycles as usize,
             CycleAddition::PageBoundaryCrossed => {
                 if page_boundary_crossed {
-                    cycles + 1
+                    cycles as usize + 1
                 } else {
-                    cycles
+                    cycles as usize
                 }
             },
             CycleAddition::BranchOnPage => {
                 if self.previous_program_counter & 0xFF00 == self.program_counter & 0xFF00 {
-                    cycles + 1
+                    cycles as usize + 1
                 } else {
-                    cycles + 2
+                    cycles as usize + 2
                 }
             },
         }
@@ -744,7 +752,7 @@ impl<T: bus::CPUMemory> Cpu<T> {
     // Arithmetic operations
     pub fn adc(&mut self, operand: u8) {
         let mut result: u16 = u16::from(self.accumulator) + u16::from(operand) + u16::from(self.status.carry);
-        if self.status.decimal {
+        if self.status.decimal && self.config.decimal_mode {
             let mut sum = (self.accumulator & 0xF) + (operand & 0xF) + u8::from(self.status.carry);
             if sum >= 0xA {
                 sum = ((sum + 0x6) & 0xF) + 0x10;
@@ -773,7 +781,7 @@ impl<T: bus::CPUMemory> Cpu<T> {
         self.status.zero = result as u8 == 0;
         self.status.overflow = ((self.accumulator ^ operand) & (self.accumulator ^ result as u8) & 0x80) > 0;
         self.status.negative = (result as u8 & 0x80) > 0;
-        if self.status.decimal {
+        if self.status.decimal && self.status.decimal {
             let operand = operand as i16;
             let mut sum = (self.accumulator & 0xF) as i16 - (operand & 0xF) + self.status.carry as i16 - 1;
             if sum < 0 {
