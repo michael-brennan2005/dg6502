@@ -1019,7 +1019,7 @@ impl<T: bus::CPUMemory> Cpu<T> {
         let program_counter = ((high_byte as u16) << 8) | low_byte as u16;
 
         self.status = status;
-        self.program_counter = program_counter - 1;
+        self.program_counter = program_counter.wrapping_sub(1);
     }
 
     // Other
