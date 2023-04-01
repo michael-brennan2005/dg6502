@@ -1,5 +1,11 @@
 [package]
 name = "dg6502"
+description="A 6502 emulator."
+repository="https://github.com/tech0tron/dg6502"
+license="MIT"
+keywords=["gamedev", "emulator", "mos6502"]
+authors=["Michael Brennan"]
+categories=["emulators"]
 version = "0.1.0"
 edition = "2021"
 

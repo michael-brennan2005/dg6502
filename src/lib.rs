@@ -7,22 +7,22 @@
 //! Support for using this as an executable is not yet done: the current main.rs code just runs nestest.
 //! ## Basic Example
 //! ```
-//! use dg6502::{Cpu, BasicCPUMemory, CpuConfig}
+//! use dg6502::{Cpu, BasicCPUMemory, CpuConfig, JamBehavior, IllegalBehavior}
 //! 
 //! // Load a program from a file into memory, starting at 0x0.
-//! let memory = BasicCPUMemory::from_file("my_file.bin", 0x0)?;
+//! let memory = BasicCPUMemory::from_file(&String::from("my_file.bin"), 0x0)?;
 //! 
 //! // Configure our CPU and our starting status register.
 //! let config = CpuConfig::default()
 //!     .bcd_support(true) // allow BCD arithmetic
-//!     .jam_behvaior(JamBehavior::Nop) // treat JAMs as NOPs
-//!     .illegal_behavior(IllegalBehavior::Execute) // run illegal instructions
+//!     .jam_behavior(JamBehavior::Nop) // treat JAMs as NOPs
+//!     .illegal_behavior(IllegalBehavior::Execute); // run illegal instructions
 //! 
 //! let status = StatusRegister::default();
 //! 
 //! // Initialize CPU and set our program counter to 0x0 
 //! // (set to 0x0 by default, this is just for example)
-//! let cpu = Cpu::new(memory, config, status);
+//! let mut cpu = Cpu::new(memory, config, status);
 //! 
 //! // Run!
 //! loop {
@@ -49,8 +49,8 @@
 //! about the design of this emulator, which you could read here if you'd like (COMING SOON).
 //! 
 //! ## Support
-//! If you have any bugs, feedback, questions, issues, suggestions, etc., feel free to submit an issue to 
-//! [the github repository](https://github.com/tech0tron/dg6502).
+//! If you have any bugs, feedback, questions, issues, suggestions, etc., feel free to submit an issue to
+//! the dg6502 repository.
 //! 
 mod cpu;
 mod bus;

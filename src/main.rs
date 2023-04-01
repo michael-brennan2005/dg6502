@@ -5,7 +5,7 @@ use dg6502::{Cpu, CpuConfig, BasicCPUMemory, StatusRegister, CPUMemory};
 
 mod cpu_tests;
 
-fn main() {
+fn main() { 
     let nestest = fs::read("test_rom/nestest.nes").unwrap();
 
     let mut memory_vec = vec![0; 65536];
