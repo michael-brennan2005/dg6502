@@ -8,7 +8,7 @@ authors=["Michael Brennan"]
 categories=["emulators"]
 version = "0.1.0"
 edition = "2021"
-ignore=["test_rom/", "test_json/"]
+exclude=["test_rom/", "test_json/"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
