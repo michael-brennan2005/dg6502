@@ -4,6 +4,7 @@
 //! Using dg6502 first requires constructing a CPUMemory object that will be used by the CPU to read and
 //! write to memory, then constructing a CPU object. Instructions can be executed calling the CPU's step() function.
 //! 
+//! Support for using this as an executable is not yet done: the current main.rs code just runs nestest.
 //! ## Basic Example
 //! ```
 //! use dg6502::{Cpu, BasicCPUMemory, CpuConfig}
