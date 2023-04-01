@@ -1,13 +1,8 @@
-use std::{fs::{File, self}, io::{BufReader, Read, Write, stdout}};
+use std::{fs::{self}, io::{stdout}};
 
-use bus::BasicCPUMemory;
-use cpu::{Cpu, CpuConfig, StatusRegister};
-use crossterm::{ExecutableCommand, style::Print, terminal::Clear, execute, event::{read, Event, KeyCode, KeyEventKind}};
+use crossterm::{style::Print, terminal::Clear, execute, event::{read, Event, KeyCode, KeyEventKind}};
+use dg6502::{Cpu, CpuConfig, BasicCPUMemory, StatusRegister, CPUMemory};
 
-use crate::bus::CPUMemory;
-
-pub mod bus;
-pub mod cpu;
 mod cpu_tests;
 
 fn main() {
@@ -22,13 +17,14 @@ fn main() {
     }
 
     let nestest_mem = BasicCPUMemory::try_from(memory_vec).unwrap();
-    let mut status = StatusRegister::new();
+    let mut status = StatusRegister::default();
     status.ignored = true;
     status.interrupt = true;
-    let mut cpu = Cpu::new(nestest_mem, CpuConfig { decimal_mode: false }, status);
+    let mut cpu = Cpu::new(nestest_mem, CpuConfig::default(), status);
 
     cpu.program_counter = 0xC000;
     let mut steps: usize = 0;
+
     loop {
         execute!(
             stdout(),

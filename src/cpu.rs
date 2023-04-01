@@ -2,7 +2,6 @@ use std::fmt::Display;
 
 use crate::bus;
 
-
 const LOOKUP_TABLE: [(Instruction, AddressMode); 256] = [
     (Instruction::BRK, AddressMode::Implied),  (Instruction::ORA, AddressMode::IndirectXIndex), (Instruction::JAM, AddressMode::Accumulator),   (Instruction::SLO, AddressMode::IndirectXIndex), (Instruction::NOP, AddressMode::Zeropage), (Instruction::ORA, AddressMode::Zeropage), (Instruction::ASL, AddressMode::Zeropage), (Instruction::SLO, AddressMode::Zeropage), (Instruction::PHP, AddressMode::Implied), (Instruction::ORA, AddressMode::Immediate), (Instruction::ASL, AddressMode::Accumulator), (Instruction::ANC, AddressMode::Immediate), (Instruction::NOP, AddressMode::Absolute), (Instruction::ORA, AddressMode::Absolute), (Instruction::ASL, AddressMode::Absolute), (Instruction::SLO, AddressMode::Absolute),
     (Instruction::BPL, AddressMode::Relative), (Instruction::ORA, AddressMode::IndirectYIndex), (Instruction::JAM, AddressMode::Accumulator),   (Instruction::SLO, AddressMode::IndirectYIndex), (Instruction::NOP, AddressMode::ZeropageXIndex), (Instruction::ORA, AddressMode::ZeropageXIndex), (Instruction::ASL, AddressMode::ZeropageXIndex), (Instruction::SLO, AddressMode::ZeropageXIndex), (Instruction::CLC, AddressMode::Implied), (Instruction::ORA, AddressMode::AbsoluteYIndex), (Instruction::NOP, AddressMode::Implied), (Instruction::SLO, AddressMode::AbsoluteYIndex), (Instruction::NOP, AddressMode::AbsoluteXIndex), (Instruction::ORA, AddressMode::AbsoluteXIndex), (Instruction::ASL, AddressMode::AbsoluteXIndex), (Instruction::SLO, AddressMode::AbsoluteXIndex),
@@ -49,7 +48,7 @@ enum CycleAddition {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum Instruction {
+enum Instruction {
     /// add with carry
     ADC,
     /// and (with accumulator)
@@ -207,11 +206,10 @@ pub enum Instruction {
     USBC,
     /// Jams.
     JAM,
-    Illegal
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum AddressMode {
+enum AddressMode {
     Accumulator,
     Absolute,
     AbsoluteXIndex,
@@ -225,10 +223,11 @@ pub enum AddressMode {
     Zeropage,
     ZeropageXIndex,
     ZeropageYIndex,
-    Illegal
 }
 
-#[derive(Debug, Clone, Copy)]
+/// Representation of 6502's status register. You may want to construct this and pass it in when constructing a CPU.
+/// Using [StatusRegister]'s default() will return a status register with all fields set to false (0).
+#[derive(Debug, Default, Clone, Copy)]
 pub struct StatusRegister {
     pub negative: bool,
     pub overflow: bool,
@@ -241,10 +240,8 @@ pub struct StatusRegister {
 }
 
 impl StatusRegister {
-    pub fn new() -> Self {
-        StatusRegister { negative: false, overflow: false, ignored: false, _break: false, decimal: false, interrupt: false, zero: false, carry: false }
-    }
 
+    /// Utility for converting a StatusRegister to a u8. Helpful for debugging and testing.
     pub fn to_u8(&self) -> u8 {
         (self.negative as u8) << 7 |
         (self.overflow as u8) << 6 |
@@ -256,6 +253,7 @@ impl StatusRegister {
         (self.carry as u8)
     }
 
+    /// Utility for converting a u8 to a StatusRegister. Helpful for debugging and testing.
     pub fn from_u8(x: u8) -> Self {
        StatusRegister {
            negative: (x & 0b10000000) >> 7 == 1,
@@ -281,10 +279,79 @@ mod status_register_test {
     }
 }
 
+/// Determines how the CPU should handle JAM instructions.
+#[derive(Debug, Clone, Copy)]
+pub enum JamBehavior {
+    /// Will set the CPU into a "jammed" state where calling step() will not execute instructions until reset() is called. 
+    Jam,
+    /// Treat JAM instructions as NOP instructions. In this case, the cycles of a JAM instruction will always be zero.
+    Nop,
+    /// Call panic!() on a JAM instruction.
+    Panic
+}
+
+/// Determines how the CPU should handle illegal instructions.
+#[derive(Debug, Clone, Copy)]
+pub enum IllegalBehavior {
+    /// Treat illegal instructions as legal instructions and execute them.
+    Execute,
+    /// Treat illegal instructions as NOP instructions. In this case, the cycles of illegal instructions will always be zero.
+    Nop,
+    /// Call panic!() on an illegal instruction.
+    Panic
+}
+
+/// Used to customize behavior for the Cpu.
 #[derive(Debug, Clone, Copy)]
 pub struct CpuConfig {
-    pub decimal_mode: bool
+    /// If true, ADC and SBC will carry out BCD arithmetic when the decimal flag is set. If false,
+    /// ADC and SBC will carry out normal arithmetic regardless of what the decimal flag is.
+    pub bcd_support: bool,
+    /// How the CPU should handle a JAM instruction.
+    pub jam_behavior: JamBehavior,
+    /// How the CPU should handle illegal instructions.
+    pub illegal_behavior: IllegalBehavior 
 }
+
+/// By default, CpuConfig will have decimal support enabled, JAM instructions will be treated as NOPs, and illegal instructions will be executed.
+impl Default for CpuConfig {
+    fn default() -> Self {
+        CpuConfig { 
+            bcd_support: true,
+            jam_behavior: JamBehavior::Jam,
+            illegal_behavior: IllegalBehavior::Execute 
+        }
+    }
+}
+
+impl CpuConfig {
+    pub fn bcd_support(mut self, x: bool) -> Self {
+        self.bcd_support = x;
+        self
+    }
+
+    pub fn jam_behavior(mut self, x: JamBehavior) -> Self {
+        self.jam_behavior = x;
+        self
+    }
+
+    pub fn illegal_behavior(mut self, x: IllegalBehavior) -> Self {
+        self.illegal_behavior = x;
+        self
+    }
+}
+
+/// The return value of the Cpu's step().
+pub enum CpuStepReturn {
+    /// What the Cpu's step() returns on a successful fetch-decode-execute cycle.
+    Ok(usize),
+    /// What the Cpu returns when it is in a "jammed" state, i.e when a JAM instruction was just
+    /// executed or after a JAM instruction has been executed but a reset has not yet occurred.
+    /// In this case the CPU has not done any fetch-decod-execute cycle.
+    Jam 
+}
+
+/// For executing 6502 instructions.
 pub struct Cpu<T: bus::CPUMemory> {
     pub previous_program_counter: u16,
     pub program_counter: u16,
@@ -294,7 +361,8 @@ pub struct Cpu<T: bus::CPUMemory> {
     pub status: StatusRegister,
     pub stack_pointer: u8,
     pub bus: T,
-    pub config: CpuConfig
+    pub config: CpuConfig,
+    pub jammed: bool
 }
 
 impl<T: bus::CPUMemory> Display for Cpu<T> {
@@ -311,6 +379,7 @@ impl<T: bus::CPUMemory> Display for Cpu<T> {
 }
 
 impl<T: bus::CPUMemory> Cpu<T> {
+    /// Construct a new Cpu given a config and a status register to start with.
     pub fn new(bus: T, config: CpuConfig, status: StatusRegister) -> Self {
         Cpu {
             previous_program_counter: 0x0,
@@ -321,11 +390,12 @@ impl<T: bus::CPUMemory> Cpu<T> {
             status,
             stack_pointer: 0xFD,
             bus,
-            config
+            config,
+            jammed: false
         }
     }
 
-    pub fn set_if_zero(&mut self, operand: u8) {
+    fn set_if_zero(&mut self, operand: u8) {
         if operand == 0 {
             self.status.zero = true;
         } else {
@@ -333,13 +403,13 @@ impl<T: bus::CPUMemory> Cpu<T> {
         }
     }
 
-    pub fn set_if_negative(&mut self, operand: u8) {
+    fn set_if_negative(&mut self, operand: u8) {
         self.status.negative = (operand as i8) < 0;
     }
 
     /// (Operand, Address, PageBoundaryCrossed)
     /// PageBoundaryCrossed will only possibly be true in AbsoluteXIndex, AbsoluteYIndex, and IndirectYIndex
-    pub fn fetch_operand(&mut self, address_mode: AddressMode) -> (u8, u16, bool) {
+    fn fetch_operand(&mut self, address_mode: AddressMode) -> (u8, u16, bool) {
         match address_mode {
             AddressMode::Accumulator => {
                 (self.accumulator, 0, false)
@@ -435,14 +505,12 @@ impl<T: bus::CPUMemory> Cpu<T> {
                 let low_byte = self.bus.read(self.program_counter.wrapping_add(1));
                 self.program_counter = self.program_counter.wrapping_add(1);
                 (self.bus.read(self.y.wrapping_add(low_byte) as u16), self.y.wrapping_add(low_byte) as u16, false)
-            },
-            AddressMode::Illegal => {
-                panic!();
             }
         }
 
     }
 
+    /// Used to emulate a reset, setting the program counter based off the bytes at 0xFFFC and 0xFFFD.
     pub fn reset(&mut self) {
         let high_byte = self.bus.read(0xFFFD);
         let low_byte = self.bus.read(0xFFFC);
@@ -451,7 +519,9 @@ impl<T: bus::CPUMemory> Cpu<T> {
         self.program_counter = new_address;
     }
 
-    pub fn step(&mut self) -> usize {
+    /// step() will run the fetch, decode, and execute cycle for one instruction, and return the number of cycles (it would take on a real 6502)
+    /// to do so.
+    pub fn step(&mut self) -> CpuStepReturn {
         let opcode = self.bus.read(self.program_counter);
 
         let high_nibble = (opcode & 0xF0) >> 4;
@@ -529,32 +599,58 @@ impl<T: bus::CPUMemory> Cpu<T> {
             Instruction::TXA => self.txa(),
             Instruction::TXS => self.txs(),
             Instruction::TYA => self.tya(),
-            // VVVV Illegal
-            Instruction::ALR => self.alr(operand),
-            Instruction::ANC => self.anc(operand),
-            Instruction::ANE => self.ane(operand),
-            Instruction::ARR => self.arr(address, operand),
-            Instruction::DCP => self.dcp(address, operand),
-            Instruction::ISC => self.isc(address, operand),
-            Instruction::LAS => self.las(operand),
-            Instruction::LAX => self.lax(operand),
-            Instruction::LXA => self.lxa(operand),
-            Instruction::RLA => self.rla(address, operand),
-            Instruction::RRA => self.rra(address, operand),
-            Instruction::SAX => self.sax(address),
-            Instruction::SBX => self.sbx(operand),
-            Instruction::SHA => self.sha(address),
-            Instruction::SHX => self.shx(address),
-            Instruction::SHY => self.shy(address),
-            Instruction::SLO => self.slo(address, operand),
-            Instruction::SRE => self.sre(address, operand),
-            Instruction::TAS => self.tas(address),
-            Instruction::USBC => self.usbc(operand),
-            // TODO: Implement jam functionality? 
+            // VVVV Jam
             Instruction::JAM => {
-                return 0;
+                match self.config.jam_behavior {
+                    JamBehavior::Jam => {
+                        self.jammed = true;
+                        return CpuStepReturn::Jam;
+                    },
+                    JamBehavior::Nop => {
+                        self.nop();
+                        return CpuStepReturn::Ok(0);
+                    },
+                    JamBehavior::Panic => {
+                        panic!("A JAM instruction was encountered and this Cpu's JamBehavior has been set to Panic.")
+                    }
+                }
             },
-            Instruction::Illegal => panic!(),
+            // VVVV Illegal
+            _ => {
+                match self.config.illegal_behavior {
+                    IllegalBehavior::Execute => match opcode {
+                        Instruction::ALR => self.alr(operand),
+                        Instruction::ANC => self.anc(operand),
+                        Instruction::ANE => self.ane(operand),
+                        Instruction::ARR => self.arr(address, operand),
+                        Instruction::DCP => self.dcp(address, operand),
+                        Instruction::ISC => self.isc(address, operand),
+                        Instruction::LAS => self.las(operand),
+                        Instruction::LAX => self.lax(operand),
+                        Instruction::LXA => self.lxa(operand),
+                        Instruction::RLA => self.rla(address, operand),
+                        Instruction::RRA => self.rra(address, operand),
+                        Instruction::SAX => self.sax(address),
+                        Instruction::SBX => self.sbx(operand),
+                        Instruction::SHA => self.sha(address),
+                        Instruction::SHX => self.shx(address),
+                        Instruction::SHY => self.shy(address),
+                        Instruction::SLO => self.slo(address, operand),
+                        Instruction::SRE => self.sre(address, operand),
+                        Instruction::TAS => self.tas(address),
+                        Instruction::USBC => self.usbc(operand),
+                        // all other instructions were checked in outer match
+                        _ => unreachable!()
+                    },
+                    IllegalBehavior::Nop => {
+                        self.nop();
+                        return CpuStepReturn::Ok(0)
+                    },
+                    IllegalBehavior::Panic => {
+                        panic!("An illegal instruction was encountered and this Cpu's IllegalBehavior has been set to Panic.")
+                    },
+                }
+            }
         }
 
         self.previous_program_counter = self.program_counter;
@@ -562,37 +658,37 @@ impl<T: bus::CPUMemory> Cpu<T> {
 
         let (cycles, addition) = CYCLE_TIMES[(high_nibble * 16 + low_nibble) as usize];
         match addition {
-            CycleAddition::None => cycles as usize,
+            CycleAddition::None => CpuStepReturn::Ok(cycles as usize),
             CycleAddition::PageBoundaryCrossed => {
                 if page_boundary_crossed {
-                    cycles as usize + 1
+                    CpuStepReturn::Ok(cycles as usize + 1)
                 } else {
-                    cycles as usize
+                    CpuStepReturn::Ok(cycles as usize + 1)
                 }
             },
             CycleAddition::BranchOnPage => {
                 if self.previous_program_counter & 0xFF00 == self.program_counter & 0xFF00 {
-                    cycles as usize + 1
+                    CpuStepReturn::Ok(cycles as usize + 1)
                 } else {
-                    cycles as usize + 2
+                    CpuStepReturn::Ok(cycles as usize + 2)
                 }
             },
         }
 
     }
 
-    pub fn push_to_stack(&mut self, x: u8) {
+    fn push_to_stack(&mut self, x: u8) {
         self.bus.write(self.stack_pointer as u16 + 0x100, x);
         self.stack_pointer = self.stack_pointer.wrapping_sub(1);
     }
 
-    pub fn pop_from_stack(&mut self) -> u8 {
+    fn pop_from_stack(&mut self) -> u8 {
         self.stack_pointer = self.stack_pointer.wrapping_add(1);
         let x = self.bus.read(self.stack_pointer as u16 + 0x100);
         x
     }
 
-    pub fn compare(&mut self, r: i8, val: i8) {
+    fn compare(&mut self, r: i8, val: i8) {
         if r as u8 >= val as u8 {
             self.status.carry = true;
         } else {
@@ -613,89 +709,89 @@ impl<T: bus::CPUMemory> Cpu<T> {
         }
     }
 
-    pub fn lower_digit(&mut self, x: u8) -> u8 {
+    fn lower_digit(&mut self, x: u8) -> u8 {
         x | 0xF
     }
 
-    pub fn upper_digit(&mut self, x: u8) -> u8 {
+    fn upper_digit(&mut self, x: u8) -> u8 {
         (x | 0xF0) >> 4
     }
 
     // Transfer instructions
-    pub fn lda(&mut self, operand: u8) {
+    fn lda(&mut self, operand: u8) {
         self.accumulator = operand;
         self.set_if_negative(operand);
         self.set_if_zero(operand);
     }
 
-    pub fn ldx(&mut self, operand: u8) {
+    fn ldx(&mut self, operand: u8) {
         self.x = operand;
         self.set_if_negative(operand);
         self.set_if_zero(operand);
     }
 
-    pub fn ldy(&mut self, operand: u8) {
+    fn ldy(&mut self, operand: u8) {
         self.y = operand;
         self.set_if_negative(operand);
         self.set_if_zero(operand);
     }
 
-    pub fn sta(&mut self, address: u16) {
+    fn sta(&mut self, address: u16) {
         self.bus.write(address, self.accumulator);
     }
 
-    pub fn stx(&mut self, address: u16) {
+    fn stx(&mut self, address: u16) {
         self.bus.write(address, self.x);
     }
 
-    pub fn sty(&mut self, address: u16) {
+    fn sty(&mut self, address: u16) {
         self.bus.write(address, self.y);
     }
 
-    pub fn tax(&mut self) {
+    fn tax(&mut self) {
         self.x = self.accumulator;
         self.set_if_negative(self.x);
         self.set_if_zero(self.x);
     }
 
-    pub fn tay(&mut self) {
+    fn tay(&mut self) {
         self.y = self.accumulator;
         self.set_if_negative(self.y);
         self.set_if_zero(self.y);
     }
 
-    pub fn tsx(&mut self) {
+    fn tsx(&mut self) {
         self.x = self.stack_pointer;
         self.set_if_negative(self.x);
         self.set_if_zero(self.x);
     }
 
-    pub fn txa(&mut self) {
+    fn txa(&mut self) {
         self.accumulator = self.x;
         self.set_if_negative(self.accumulator);
         self.set_if_zero(self.accumulator);
    }
 
-    pub fn txs(&mut self) {
+    fn txs(&mut self) {
         self.stack_pointer = self.x;
     }
 
-    pub fn tya(&mut self) {
+    fn tya(&mut self) {
         self.accumulator = self.y;
         self.set_if_negative(self.accumulator);
         self.set_if_zero(self.accumulator);
    }
 
     // Stack instructions
-    pub fn pha(&mut self) {
+    fn pha(&mut self) {
         self.push_to_stack(self.accumulator);
     }
 
-    pub fn php(&mut self) {
+    fn php(&mut self) {
         self.push_to_stack(self.status.to_u8() | (0b00110000));
     }
 
-    pub fn pla(&mut self) {
+    fn pla(&mut self) {
         self.stack_pointer = self.stack_pointer.wrapping_add(1);
         let new_accumulator = self.bus.read(self.stack_pointer as u16 + 0x100);
         self.accumulator = new_accumulator;
@@ -704,7 +800,7 @@ impl<T: bus::CPUMemory> Cpu<T> {
     }
 
 
-    pub fn plp(&mut self) {
+    fn plp(&mut self) {
         let stack_status = self.pop_from_stack();
         let current_status = self.status.to_u8();
         
@@ -713,46 +809,46 @@ impl<T: bus::CPUMemory> Cpu<T> {
     }
 
     // Decrements & increments
-    pub fn dec(&mut self, address: u16, operand: u8) {
+    fn dec(&mut self, address: u16, operand: u8) {
         self.bus.write(address, operand.wrapping_sub(1));
         self.set_if_negative(operand.wrapping_sub(1));
         self.set_if_zero(operand.wrapping_sub(1));
     }
 
-    pub fn dex(&mut self) {
+    fn dex(&mut self) {
         self.x = self.x.wrapping_sub(1);
         self.set_if_negative(self.x);
         self.set_if_zero(self.x);
     }
 
-    pub fn dey(&mut self) {
+    fn dey(&mut self) {
         self.y = self.y.wrapping_sub(1);
         self.set_if_negative(self.y);
         self.set_if_zero(self.y);
     }
 
-    pub fn inc(&mut self, address: u16, operand: u8) {
+    fn inc(&mut self, address: u16, operand: u8) {
         self.bus.write(address, operand.wrapping_add(1));
         self.set_if_negative(operand.wrapping_add(1));
         self.set_if_zero(operand.wrapping_add(1));
     }
 
-   pub fn inx(&mut self) {
+    fn inx(&mut self) {
         self.x = self.x.wrapping_add(1);
         self.set_if_negative(self.x);
         self.set_if_zero(self.x);
     }
 
-    pub fn iny(&mut self) {
+    fn iny(&mut self) {
         self.y = self.y.wrapping_add(1);
         self.set_if_negative(self.y);
         self.set_if_zero(self.y);
     }
 
     // Arithmetic operations
-    pub fn adc(&mut self, operand: u8) {
+    fn adc(&mut self, operand: u8) {
         let mut result: u16 = u16::from(self.accumulator) + u16::from(operand) + u16::from(self.status.carry);
-        if self.status.decimal && self.config.decimal_mode {
+        if self.status.decimal && self.config.bcd_support {
             let mut sum = (self.accumulator & 0xF) + (operand & 0xF) + u8::from(self.status.carry);
             if sum >= 0xA {
                 sum = ((sum + 0x6) & 0xF) + 0x10;
@@ -775,7 +871,7 @@ impl<T: bus::CPUMemory> Cpu<T> {
         self.accumulator = result as u8;
     }
 
-    pub fn sbc(&mut self, operand: u8) {
+    fn sbc(&mut self, operand: u8) {
         let mut result = u16::from(self.accumulator) + u16::from(!operand) + (if self.status.carry { 1 } else { 0 });
         self.status.carry = result > u16::from(u8::max_value());
         self.status.zero = result as u8 == 0;
@@ -797,26 +893,26 @@ impl<T: bus::CPUMemory> Cpu<T> {
     }
 
     // Logical operations
-    pub fn and(&mut self, operand: u8) {
+    fn and(&mut self, operand: u8) {
         self.accumulator &= operand;
         self.set_if_negative(self.accumulator);
         self.set_if_zero(self.accumulator);
     }
 
-    pub fn ora(&mut self, operand: u8) {
+    fn ora(&mut self, operand: u8) {
         self.accumulator |= operand;
         self.set_if_negative(self.accumulator);
         self.set_if_zero(self.accumulator);
     }
 
-    pub fn eor(&mut self, operand: u8) {
+    fn eor(&mut self, operand: u8) {
         self.accumulator ^= operand;
         self.set_if_negative(self.accumulator);
         self.set_if_zero(self.accumulator);
     }
 
     // Shift & rotate instructions
-    pub fn asl(&mut self, address: u16, operand: u8, accumulator: bool) {
+    fn asl(&mut self, address: u16, operand: u8, accumulator: bool) {
         if accumulator {
             self.status.carry = self.accumulator >> 7 == 1;
             self.accumulator = self.accumulator << 1;
@@ -831,7 +927,7 @@ impl<T: bus::CPUMemory> Cpu<T> {
         }
     }
 
-    pub fn lsr(&mut self, address: u16, operand: u8, accumulator: bool) {
+    fn lsr(&mut self, address: u16, operand: u8, accumulator: bool) {
         if accumulator {
             self.status.carry = self.accumulator & 0b1 == 1;
             self.accumulator = self.accumulator >> 1;
@@ -846,7 +942,7 @@ impl<T: bus::CPUMemory> Cpu<T> {
         }
     }
 
-    pub fn rol(&mut self, address: u16, operand: u8, accumulator: bool) {
+    fn rol(&mut self, address: u16, operand: u8, accumulator: bool) {
         if accumulator {
             let carry = self.status.carry;
             self.status.carry = (self.accumulator >> 7) == 1;
@@ -863,7 +959,7 @@ impl<T: bus::CPUMemory> Cpu<T> {
         }
     }
 
-    pub fn ror(&mut self, address: u16, operand: u8, accumulator: bool) {
+    fn ror(&mut self, address: u16, operand: u8, accumulator: bool) {
         if accumulator {
             let carry = self.status.carry as u8;
             self.status.carry = (self.accumulator & 1) == 1;
@@ -881,103 +977,103 @@ impl<T: bus::CPUMemory> Cpu<T> {
     }
 
     // Flag instructions
-    pub fn clc(&mut self) {
+    fn clc(&mut self) {
         self.status.carry = false;
     }
 
-    pub fn cld(&mut self) {
+    fn cld(&mut self) {
         self.status.decimal = false;
     }
 
-    pub fn cli(&mut self) {
+    fn cli(&mut self) {
         self.status.interrupt = false;
     }
 
-    pub fn clv(&mut self) {
+    fn clv(&mut self) {
         self.status.overflow = false;
     }
 
-    pub fn sec(&mut self) {
+    fn sec(&mut self) {
         self.status.carry = true;
     }
 
-    pub fn sed(&mut self) {
+    fn sed(&mut self) {
         self.status.decimal = true;
     }
 
-    pub fn sei(&mut self) {
+    fn sei(&mut self) {
        self.status.interrupt = true;
     }
 
     // Comparisons - stolen from another rust emulator
-    pub fn cmp(&mut self, operand: u8) {
+    fn cmp(&mut self, operand: u8) {
         self.compare(self.accumulator as i8, operand as i8);
     }
 
-    pub fn cpx(&mut self, operand: u8) {
+    fn cpx(&mut self, operand: u8) {
         self.compare(self.x as i8, operand as i8);
     }
 
-    pub fn cpy(&mut self, operand: u8) {
+    fn cpy(&mut self, operand: u8) {
         self.compare(self.y as i8, operand as i8);
     }
 
     // Branch instructions
-    pub fn bcc(&mut self, address: u16) {
+    fn bcc(&mut self, address: u16) {
         if !self.status.carry {
             self.program_counter = address;
         }
     }
 
-    pub fn bcs(&mut self, address: u16) {
+    fn bcs(&mut self, address: u16) {
         if self.status.carry {
             self.program_counter = address;
         }
     }
 
-    pub fn beq(&mut self, address: u16) {
+    fn beq(&mut self, address: u16) {
         if self.status.zero {
             self.program_counter = address;
         }
     }
 
-    pub fn bmi(&mut self, address: u16) {
+    fn bmi(&mut self, address: u16) {
         if self.status.negative {
             self.program_counter = address;
         }
     }
 
-    pub fn bne(&mut self, address: u16) {
+    fn bne(&mut self, address: u16) {
         if !self.status.zero {
             self.program_counter = address;
         }
     }
 
-    pub fn bpl(&mut self, address: u16) {
+    fn bpl(&mut self, address: u16) {
         if !self.status.negative {
             self.program_counter = address;
         }
     }
 
-    pub fn bvc(&mut self, address: u16) {
+    fn bvc(&mut self, address: u16) {
         if !self.status.overflow {
             self.program_counter = address;
         }
     }
 
-    pub fn bvs(&mut self, address: u16) {
+    fn bvs(&mut self, address: u16) {
         if self.status.overflow {
             self.program_counter = address;
         }
     }
 
     // Jump instructions
-    pub fn jmp(&mut self, address: u16) {
+    fn jmp(&mut self, address: u16) {
         // step is always incrementing, so if we dont decrement address will be one off what it should be.
         self.program_counter = address.wrapping_sub(1);
     }
 
-    pub fn jsr(&mut self, address: u16) {
+    fn jsr(&mut self, address: u16) {
         let high_byte = ((self.program_counter) >> 8) as u8;
         let low_byte = ((self.program_counter) & 0b11111111) as u8;
         self.push_to_stack(high_byte);
@@ -986,14 +1082,14 @@ impl<T: bus::CPUMemory> Cpu<T> {
         self.program_counter = address - 1; // step
     }
 
-    pub fn rts(&mut self) {
+    fn rts(&mut self) {
         let low_byte = self.pop_from_stack();
         let high_byte = self.pop_from_stack();
         self.program_counter = ((high_byte as u16) << 8) | (low_byte as u16);
     }
 
     // Interrupts
-    pub fn brk(&mut self) {
+    fn brk(&mut self) {
         self.program_counter += 2;
         let high_byte = (self.program_counter >> 8) as u8;
         let low_byte = (self.program_counter & 0xFF) as u8;
@@ -1010,7 +1106,7 @@ impl<T: bus::CPUMemory> Cpu<T> {
         self.program_counter = pc - 1; // cause of step() always incrementing
     }
 
-    pub fn rti(&mut self) {
+    fn rti(&mut self) {
         let mut status = StatusRegister::from_u8(self.pop_from_stack());
         status.ignored = true;
         status._break = false;
@@ -1023,56 +1119,52 @@ impl<T: bus::CPUMemory> Cpu<T> {
     }
 
     // Other
-    pub fn bit(&mut self, operand: u8) {
+    fn bit(&mut self, operand: u8) {
         self.status.negative = (operand & 0b10000000) > 0;
         self.status.overflow = (operand & 0b01000000) > 0;
 
         self.status.zero = (operand & self.accumulator) == 0;
     }
 
-    pub fn nop(&mut self) {
+    fn nop(&mut self) {
         // its noping time!
     }
 
     // Illegal Instructions!
-    pub fn alr(&mut self, operand: u8) {
+    fn alr(&mut self, operand: u8) {
         self.and(operand);
         self.lsr(0x0, operand, true);
     }
 
-    pub fn anc(&mut self, operand: u8) {
+    fn anc(&mut self, operand: u8) {
         self.and(operand);
         self.status.carry = (self.accumulator & 0x80) > 0;
     }
 
-    pub fn ane(&mut self, operand: u8) {
+    fn ane(&mut self, operand: u8) {
         self.accumulator = (self.accumulator | 0xFF) & self.x & operand;
         self.status.negative = self.accumulator & 0x80 > 0;
         self.status.zero = self.accumulator == 0;
     }
 
-    // FIXME: Problem child! WHERE DOES BIT 7 come from?
-    pub fn arr(&mut self, address: u16, operand: u8) {
-        let bit7_1 = (operand & 0x80) > 0;
+    fn arr(&mut self, address: u16, operand: u8) {
         self.and(operand);
-        let bit7_2 = (self.accumulator& 0x80) > 0;
         self.ror(0x0, self.bus.read(address), true);
-        let bit7_3 = (self.bus.read(address) & 0x80) > 0;
         let bit7_4 = (self.accumulator & 0x80) > 0;
         self.status.carry = bit7_4;
     }
 
-    pub fn dcp(&mut self, address: u16, operand: u8) {
+    fn dcp(&mut self, address: u16, operand: u8) {
         self.dec(address, operand);
         self.cmp(self.bus.read(address));
     }
 
-    pub fn isc(&mut self, address: u16, operand: u8) {
+    fn isc(&mut self, address: u16, operand: u8) {
         self.inc(address, operand);
         self.sbc(self.bus.read(address));
     }
 
-    pub fn las(&mut self, operand: u8) {
+    fn las(&mut self, operand: u8) {
         let result = operand & self.stack_pointer;
         self.accumulator = result;
         self.x = result;
@@ -1082,12 +1174,12 @@ impl<T: bus::CPUMemory> Cpu<T> {
         self.status.zero = result == 0;
     }
 
-    pub fn lax(&mut self, operand: u8) {
+    fn lax(&mut self, operand: u8) {
         self.lda(operand);
         self.ldx(self.accumulator);
     }
 
-    pub fn lxa(&mut self, operand: u8) {
+    fn lxa(&mut self, operand: u8) {
         let result = (self.accumulator | 0xFF) & operand;
         self.accumulator = result;
         self.x = self.accumulator;
@@ -1096,58 +1188,58 @@ impl<T: bus::CPUMemory> Cpu<T> {
         self.status.zero = result == 0;
     }
 
-    pub fn rla(&mut self, address: u16, operand: u8) {
+    fn rla(&mut self, address: u16, operand: u8) {
         self.rol(address, operand, false);
         self.and(self.bus.read(address));
     }
 
-    pub fn rra(&mut self, address: u16, operand: u8) {
+    fn rra(&mut self, address: u16, operand: u8) {
         self.ror(address, operand, false);
         self.adc(self.bus.read(address));
     }
 
-    pub fn sax(&mut self, address: u16) {
+    fn sax(&mut self, address: u16) {
         self.bus.write(address, self.accumulator & self.x);
     }
 
-    pub fn sbx(&mut self, operand: u8) {
+    fn sbx(&mut self, operand: u8) {
         self.x = (self.accumulator & self.x).wrapping_sub(operand);
         self.status.negative = self.x & 0x80 > 0;
         self.status.zero = self.x == 0;
     }
 
-    pub fn sha(&mut self, address: u16) {
+    fn sha(&mut self, address: u16) {
         let high_byte = (((address & 0xFF00) >> 8) + 1) as u8;
         self.bus.write(address, self.accumulator & self.x & high_byte);
     }   
 
-    pub fn shx(&mut self, address: u16) {
+    fn shx(&mut self, address: u16) {
         let high_byte = (((address & 0xFF00) >> 8) + 1) as u8;
         self.bus.write(address, self.x & high_byte);
     }
 
-    pub fn shy(&mut self, address: u16) {
+    fn shy(&mut self, address: u16) {
         let high_byte = (((address & 0xFF00) >> 8) + 1) as u8;
         self.bus.write(address, self.y & high_byte);    
     }
 
-    pub fn slo(&mut self, address: u16, operand: u8) {
+    fn slo(&mut self, address: u16, operand: u8) {
         self.asl(address, operand, false);
         self.ora(self.bus.read(address));
     }
 
-    pub fn sre(&mut self, address: u16, operand: u8) {
+    fn sre(&mut self, address: u16, operand: u8) {
         self.lsr(address, operand, false);
         self.eor(self.bus.read(address));
     }
 
-    pub fn tas(&mut self, address: u16) {
+    fn tas(&mut self, address: u16) {
         let high_byte = (((address & 0xFF00) >> 8) + 1) as u8;
         self.stack_pointer = self.accumulator & self.x;
         self.bus.write(address, self.accumulator & self.x & high_byte);
     }
 
-    pub fn usbc(&mut self, operand: u8) {
+    fn usbc(&mut self, operand: u8) {
         self.sbc(operand);
     }
 }

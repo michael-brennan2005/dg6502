@@ -2,7 +2,7 @@
 mod cpu_tests {
     use std::fs;
 
-    use crate::{bus::{BasicCPUMemory, CPUMemory}, cpu::{StatusRegister, CpuConfig, Cpu}};
+    use dg6502::{BasicCPUMemory, CPUMemory, StatusRegister, CpuConfig, Cpu, CpuStepReturn};
 
     use std::{fs::read_to_string, fmt::Display, time::{Instant, Duration}};
     use serde::{Deserialize, Serialize};
@@ -74,7 +74,7 @@ mod cpu_tests {
     }
 
     fn run_and_time_test(test: OpcodeTest, panic: bool, ignore_off_by_one: bool) -> (bool, Duration, usize) {
-        let mut cpu: Cpu<BasicCPUMemory> = Cpu::new(BasicCPUMemory::default(), crate::cpu::CpuConfig { decimal_mode: true }, StatusRegister::new());
+        let mut cpu: Cpu<BasicCPUMemory> = Cpu::new(BasicCPUMemory::default(), CpuConfig::default(), StatusRegister::default());
         cpu.program_counter = test.initial.pc;
         cpu.stack_pointer = test.initial.s;
         cpu.accumulator = test.initial.a;
@@ -110,15 +110,15 @@ mod cpu_tests {
             // After trying multiple different implementations of SBC from different emulators (copying and seeing if it works), I am firmly convinced that our test suite has some mild
             // off-by-one errors in the accumulator and/or status flags in its SBC tests. This overlooking is only for those tests.
             if (ignore_off_by_one) && (actual.a.abs_diff(test.r#final.a) <= 1 || actual.p.abs_diff(test.r#final.p) <= 1) {
-                return (true, elapsed, cycles);
+                return (true, elapsed, match cycles { CpuStepReturn::Ok(x) => x, _ => 0 });
             } 
             
             if panic {
                 test_fail(test, actual);
             }
-            (false, elapsed, cycles)
+            (false, elapsed, match cycles { CpuStepReturn::Ok(x) => x, _ => 0 })
         } else {
-            (true, elapsed, cycles)
+            (true, elapsed, match cycles { CpuStepReturn::Ok(x) => x, _ => 0 })
         }
     }
 
@@ -190,10 +190,10 @@ mod cpu_tests {
         }
     
         let nestest_mem = BasicCPUMemory::try_from(memory_vec).unwrap();
-        let mut status = StatusRegister::new();
+        let mut status = StatusRegister::default();
         status.ignored = true;
         status.interrupt = true;
-        let mut cpu = Cpu::new(nestest_mem, CpuConfig { decimal_mode: false }, status);
+        let mut cpu = Cpu::new(nestest_mem, CpuConfig::default().bcd_support(false), status);
     
         cpu.program_counter = 0xC000;
         let mut steps: usize = 0;
