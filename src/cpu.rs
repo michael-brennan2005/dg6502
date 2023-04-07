@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use clap::ValueEnum;
+
 use crate::bus;
 
 const LOOKUP_TABLE: [(Instruction, AddressMode); 256] = [
@@ -280,7 +282,7 @@ mod status_register_test {
 }
 
 /// Determines how the CPU should handle JAM instructions.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum JamBehavior {
     /// Will set the CPU into a "jammed" state where calling step() will not execute instructions until reset() is called. 
     Jam,
@@ -291,7 +293,7 @@ pub enum JamBehavior {
 }
 
 /// Determines how the CPU should handle illegal instructions.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum IllegalBehavior {
     /// Treat illegal instructions as legal instructions and execute them.
     Execute,
@@ -877,7 +879,7 @@ impl<T: bus::CPUMemory> Cpu<T> {
         self.status.zero = result as u8 == 0;
         self.status.overflow = ((self.accumulator ^ operand) & (self.accumulator ^ result as u8) & 0x80) > 0;
         self.status.negative = (result as u8 & 0x80) > 0;
-        if self.status.decimal && self.status.decimal {
+        if self.status.decimal && self.config.bcd_support {
             let operand = operand as i16;
             let mut sum = (self.accumulator & 0xF) as i16 - (operand & 0xF) + self.status.carry as i16 - 1;
             if sum < 0 {

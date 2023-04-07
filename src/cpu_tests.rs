@@ -196,14 +196,29 @@ mod cpu_tests {
         let mut cpu = Cpu::new(nestest_mem, CpuConfig::default().bcd_support(false), status);
     
         cpu.program_counter = 0xC000;
+        
+        let now = Instant::now();
         let mut steps: usize = 0;
+        let mut cycles: usize = 0;
+
         while steps < 8991 {
-            cpu.step();
+            cycles += match cpu.step() {
+                CpuStepReturn::Ok(x) => {
+                    x
+                },
+                _ => {
+                    0
+                }
+            };
+
             steps += 1;
             if cpu.bus.read(0x2) != 0 || cpu.bus.read(0x3) != 0 {
                 println!("Addresses 0x2 and 0x3 have been set to: {:#X} {:#X}", cpu.bus.read(0x2), cpu.bus.read(0x3));
                 panic!()
             }
         }
+        
+        let elapsed = now.elapsed();
+        println!("NESTest took {:?}, and the CPU went through {} cycles.", elapsed, cycles)
     }
 }
