@@ -1,9 +1,9 @@
 use std::{fs::{self}, io::{stdout}, process::exit};
 
-use clap::{Command, command, arg, Parser};
+use clap::{Command, command, arg, Parser, Subcommand};
 use clap_num::maybe_hex;
 use crossterm::{style::Print, terminal::Clear, execute, event::{read, Event, KeyCode, KeyEventKind}};
-use dg6502::{Cpu, CpuConfig, BasicCPUMemory, StatusRegister, CPUMemory, JamBehavior, IllegalBehavior};
+use dg6502::{Cpu, CpuConfig, BasicCPUMemory, StatusRegister, CPUMemory, JamBehavior, IllegalBehavior, CpuStepReturn};
 
 mod cpu_tests;
 
@@ -35,6 +35,77 @@ struct Cli {
     #[arg(short='d', long)]
     bcd_support: Option<bool>
 
+}
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Debugger {
+    #[command(subcommand)]
+    command: Commands
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Step through the program.
+    Step {
+        /// How may CPU steps to take.
+        #[clap(value_parser=maybe_hex::<usize>)]
+        _steps: Option<usize>
+    },
+    /// Print out memory.
+    GetMemory {
+        /// Starting byte you'd like printed.
+        #[clap(value_parser=maybe_hex::<u16>)]
+        start: u16,
+        /// Ending byte you'd like printed.
+        #[clap(value_parser=maybe_hex::<u16>)]
+        end: Option<u16>,
+    },
+    /// Set register to a desired value. 
+    SetRegister {
+        #[command(subcommand)]
+        registers: Registers
+    },
+    /// Set memory to a desired value.
+    SetMemory {
+        /// Value you'd like to set memory to.
+        #[clap(value_parser=maybe_hex::<u8>)]
+        value: u8,
+        /// Starting byte you'd like printed.
+        #[clap(value_parser=maybe_hex::<u16>)]
+        start: u16,
+        /// Ending byte you'd like printed.
+        #[clap(value_parser=maybe_hex::<u16>)]
+        end: Option<u16>
+    }
+}
+
+#[derive(Subcommand, Debug)]
+enum Registers {
+    PC {
+        #[clap(value_parser=maybe_hex::<u16>)]
+        x: u16
+    },
+    ACC {
+        #[clap(value_parser=maybe_hex::<u8>)]
+        x: u8
+    },
+    X {
+        #[clap(value_parser=maybe_hex::<u8>)]
+        x: u8
+    },
+    Y {
+        #[clap(value_parser=maybe_hex::<u8>)]
+        x: u8
+    },
+    STAT {
+        #[clap(value_parser=maybe_hex::<u8>)]
+        x: u8
+    },
+    SP {
+        #[clap(value_parser=maybe_hex::<u8>)]
+        x: u8
+    }
 }
 fn main() {
     let cli = Cli::parse();
@@ -80,50 +151,107 @@ fn main() {
 
     let mut cpu = Cpu::new(nestest_mem, CpuConfig { bcd_support, jam_behavior, illegal_behavior }, StatusRegister::default());
 
-    // MORNING!: add a parser for lldb-type instructions
-    cpu.program_counter = 0xC000;
+    cpu.program_counter = 0x0000;
     let mut steps: usize = 0;
-
+    let mut cycles: usize = 0;
+    let mut jammed: bool = false;
     loop {
-        execute!(
-            stdout(),
-            Clear(crossterm::terminal::ClearType::All),
-            Print(&cpu),
-            Print(format!("{:#X} {:#X} | {}\n", cpu.bus.read(0x2), cpu.bus.read(0x3), steps)),
-            Print("Z - 1 steps X - 100 steps C - 1K steps V - 1M steps\n")
-        );
+        println!("{}", &cpu);
+        println!("Steps: {} | Cycles: {} | Jammed: {}", steps, cycles, cpu.jammed);
 
-        match read().unwrap() {
-            Event::Key(event) => {
-                if event.kind == KeyEventKind::Press {
-                    match event.code {
-                        KeyCode::Char('z') => {
-                            cpu.step();
-                            steps += 1;
+        let mut line = String::new();
+        std::io::stdin().read_line(&mut line).unwrap();
+
+        line = line.trim().to_string();
+
+        let mut start: Vec<&str> = vec![""];
+        let mut args: Vec<&str> = line.split(' ').collect();
+        start.append(&mut args);
+        let command = match Debugger::try_parse_from(start) {
+            Ok(cmd) => cmd,
+            Err(err) => {
+                err.print().unwrap();
+                continue;
+            },
+        };
+        
+        match command.command {
+            Commands::Step { _steps } => {
+                let to_take = match _steps {
+                    Some(x) => x,
+                    None => 1,
+                };
+
+                for _ in 0..to_take {
+                    let result = cpu.step();
+                    match result {
+                        CpuStepReturn::Ok(x) => {
+                            cycles += x;
                         },
-                        KeyCode::Char('x') => {
-                            for _ in 0..100 {
-                                cpu.step();
-                                steps += 1;
-                            }
-                        },
-                        KeyCode::Char('c') => {
-                            for _ in 0..1000 {
-                                cpu.step();
-                                steps += 1;
-                            }
-                        },
-                        KeyCode::Char('v') => {
-                            for _ in 0..1000000 {
-                                cpu.step();
-                                steps += 1;
-                            }
+                        CpuStepReturn::Jam => {
+                            continue;
                         }
-                        _ => {}
                     }
+                    steps += 1;
                 }
-            }
-            _ => {}
+            },
+            Commands::GetMemory { start, end } => {
+                match end {
+                    Some(end) => {
+                        let starting_page = start & 0xFFF0;
+                        let ending_page = (end & 0xFFF0) + 0x10;
+
+                        println!("   | 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F");
+                        for i in (0..(starting_page - ending_page)).step_by(16) {
+                            println!("{:4X} | {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X}", 
+                                (starting_page + i * 0x10),
+                                cpu.bus.read(starting_page + i * 0x10),
+                                cpu.bus.read(starting_page + 1 + i * 0x10),
+                                cpu.bus.read(starting_page + 2 + i * 0x10),
+                                cpu.bus.read(starting_page + 3 + i * 0x10),
+                                cpu.bus.read(starting_page + 4 + i * 0x10),
+                                cpu.bus.read(starting_page + 5 + i * 0x10),
+                                cpu.bus.read(starting_page + 6 + i * 0x10),
+                                cpu.bus.read(starting_page + 7 + i * 0x10),
+                                cpu.bus.read(starting_page + 8 + i * 0x10),
+                                cpu.bus.read(starting_page + 9 + i * 0x10),
+                                cpu.bus.read(starting_page + 10 + i * 0x10),
+                                cpu.bus.read(starting_page + 11 + i * 0x10),
+                                cpu.bus.read(starting_page + 12 + i * 0x10),
+                                cpu.bus.read(starting_page + 13 + i * 0x10),
+                                cpu.bus.read(starting_page + 14 + i * 0x10),
+                                cpu.bus.read(starting_page + 15 + i * 0x10)
+                            )
+                        }
+                    },
+                    None => {
+                        println!("{:#4X}", cpu.bus.read(start))
+                    },
+                }
+            },
+            Commands::SetRegister { registers } => {
+                match registers {
+                    Registers::PC { x } => cpu.program_counter = x,
+                    Registers::ACC { x } => cpu.accumulator = x,
+                    Registers::X { x } => cpu.x = x,
+                    Registers::Y { x } => cpu.y = x,
+                    Registers::STAT { x } => cpu.status = StatusRegister::from_u8(x),
+                    Registers::SP { x } => cpu.stack_pointer = x,
+                }
+            },
+            Commands::SetMemory { value, start, end } => {
+                match end {
+                    Some(x) => {
+                        for i in start..x {
+                            cpu.bus.write(i, value);
+                        }
+                    },
+                    None => {
+                        cpu.bus.write(start, value);
+                    },
+                }
+            },
         }
+
     }
 }

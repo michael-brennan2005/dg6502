@@ -376,7 +376,7 @@ impl<T: bus::CPUMemory> Display for Cpu<T> {
         write!(f, "{:5}| {:#6X} | {:#18b} | {:6}\n", "X", self.x, self.x, self.x)?;
         write!(f, "{:5}| {:#6X} | {:#18b} | {:6}\n", "Y", self.y, self.y, self.y)?;
         write!(f, "{:5}| {:#6X} | {:#18b} | {:6}\n", "STAT", self.status.to_u8(), self.status.to_u8(), self.status.to_u8())?;
-        write!(f, "{:5}| {:#6X} | {:#18b} | {:6}\n", "SP", self.stack_pointer, self.stack_pointer, self.stack_pointer) 
+        write!(f, "{:5}| {:#6X} | {:#18b} | {:6}", "SP", self.stack_pointer, self.stack_pointer, self.stack_pointer) 
     }
 }
 
@@ -521,9 +521,20 @@ impl<T: bus::CPUMemory> Cpu<T> {
         self.program_counter = new_address;
     }
 
+    /// Used to take CPU out of its jammed state.
+    pub fn unjam(&mut self) {
+        self.jammed = false;
+    }
+
     /// step() will run the fetch, decode, and execute cycle for one instruction, and return the number of cycles (it would take on a real 6502)
     /// to do so.
     pub fn step(&mut self) -> CpuStepReturn {
+        self.previous_program_counter = self.program_counter;
+
+        if self.jammed {
+            return CpuStepReturn::Jam;
+        }
+
         let opcode = self.bus.read(self.program_counter);
 
         let high_nibble = (opcode & 0xF0) >> 4;
@@ -655,7 +666,7 @@ impl<T: bus::CPUMemory> Cpu<T> {
             }
         }
 
-        self.previous_program_counter = self.program_counter;
+       
         self.program_counter = self.program_counter.wrapping_add(1);
 
         let (cycles, addition) = CYCLE_TIMES[(high_nibble * 16 + low_nibble) as usize];
