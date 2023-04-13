@@ -200,10 +200,11 @@ fn main() {
                     Some(end) => {
                         let starting_page = start & 0xFFF0;
                         let ending_page = (end & 0xFFF0) + 0x10;
+                        let page_numbers = (ending_page - starting_page + 16 - 1) / 16;
 
-                        println!("   | 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F");
-                        for i in (0..(starting_page - ending_page)).step_by(16) {
-                            println!("{:4X} | {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X} {:2X}", 
+                        println!("     | 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F");
+                        for i in 0..page_numbers {
+                            println!("{:04X} | {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X}", 
                                 (starting_page + i * 0x10),
                                 cpu.bus.read(starting_page + i * 0x10),
                                 cpu.bus.read(starting_page + 1 + i * 0x10),
